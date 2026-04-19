@@ -1,0 +1,35 @@
+dependencies:
+  idf:
+    source:
+      type: idf
+    version: 6.0.0
+  k0i05/esp_as7341:
+    component_hash: 4926fd57454970426a87519f7ce54c880ffd9ed54a1f6edb17d33187fdd02505
+    dependencies:
+    - name: idf
+      require: private
+      version: '>5.3.0'
+    - name: k0i05/esp_type_utils
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=0.0.1'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.2.7
+  k0i05/esp_type_utils:
+    component_hash: 95d8ec40268e045f7e264d8035f451e53844b4a2f6d5f112ece6645c5effd639
+    dependencies:
+    - name: idf
+      require: private
+      version: '>5.3.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.2.7
+direct_dependencies:
+- idf
+- k0i05/esp_as7341
+manifest_hash: cbaad8bb079d34c296440956d09d7bc299562378f49619c75a973914a00b0c7a
+target: esp32s3
+version: 3.0.0
