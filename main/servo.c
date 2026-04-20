@@ -2,6 +2,7 @@
 #include "driver/ledc.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_app_trace.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
 #include "servo.h"
@@ -34,6 +35,15 @@ static inline float CLAMP(float value, float min, float max) {
     return value < min ? min : (value > max ? max : value);
 }
 
+    /**
+ * @brief 自动停止定时器回调函数
+ * @param xTimer 定时器句柄
+ */
+ static void auto_stop_timer_callback(TimerHandle_t xTimer) {
+     ESP_LOGI(TAG, "Auto-stop timer expired, stopping servo");
+     servo_stop();
+ }
+
 /**
  * @brief 启动自动停止定时器
  * @param milliseconds 延迟时间(毫秒)
@@ -45,6 +55,8 @@ static esp_err_t start_auto_stop_timer(uint32_t milliseconds) {
         xTimerStop(servo_data.auto_stop_timer, portMAX_DELAY);
     }
     
+
+
     // 创建新的定时器
     servo_data.auto_stop_timer = xTimerCreate(
         "ServoAutoStop",
@@ -68,14 +80,7 @@ static esp_err_t start_auto_stop_timer(uint32_t milliseconds) {
     return ESP_OK;
 }
 
-/**
- * @brief 自动停止定时器回调函数
- * @param xTimer 定时器句柄
- */
-static void auto_stop_timer_callback(TimerHandle_t xTimer) {
-    ESP_LOGI(TAG, "Auto-stop timer expired, stopping servo");
-    servo_stop();
-}
+
 
 /**
  * @brief 配置LEDC定时器和通道
@@ -140,14 +145,7 @@ static uint32_t speed_to_pulse_width(float speed) {
     return (uint32_t)pulse_us;
 }
 
-/**
- * @brief 将脉冲宽度转换为LEDC占空比
- * @param pulse_us 脉冲宽度(微秒)
- * @return uint32_t LEDC占空比值
- */
-static uint32_t servo_pulse_to_duty(uint32_t pulse_us) {
-    return (pulse_us * (1 << LEDC_TIMER_13_BIT)) / SERVO_PERIOD_US;
-}
+
 
 /**
  * @brief 初始化360度电机控制

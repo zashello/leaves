@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include "servo.h"
 #include <as7341.h>
+#include "freertos/FreeRTOS.h"
+#include "esp_app_trace.h"
+#include "esp_log.h"
 
-void app_main(void) {
-    // 初始化电机控制
+void sevro(void* param){
     ESP_LOGI("APP", "Starting leaves application");
     
     // 初始化360度电机控制
@@ -38,4 +40,9 @@ void app_main(void) {
     // 清理资源
     servo_deinit();
     ESP_LOGI("APP", "Application completed");
+
+}
+
+void app_main(void) {
+    xTaskCreate(sevro,"servo",2048,NULL,3,NULL);
 }
