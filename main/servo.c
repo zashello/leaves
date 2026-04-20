@@ -1,136 +1,312 @@
+#include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "esp_err.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
+#include "servo.h"
 
-// 定义舵机连接的GPIO引脚
-#define SERVO_PIN 18
+// 日志标签
+#define TAG "SERVO"
 
-// 舵机PWM标准参数
-#define SERVO_MIN_PULSE_WIDTH 500000  // 最小脉冲宽度500μs
-#define SERVO_MAX_PULSE_WIDTH 2500000 // 最大脉冲宽度2500μs (2.5ms)
-#define SERVO_FREQ 50                 // 舵机标准频率50Hz
+// 硬件配置
+#define SERVO_LEDC_CHANNEL LEDC_CHANNEL_0
+#define SERVO_LEDC_TIMER   LEDC_TIMER_0
+#define SERVO_GPIO_NUM GPIO_NUM_18  // 可根据实际硬件连接修改
 
 typedef struct {
-    uint8_t pin;
+    bool initialized;
     ledc_channel_t channel;
-    ledc_timer_t timer;
-} servo_t;
+    gpio_num_t gpio_num;
+    TimerHandle_t auto_stop_timer;
+} servo_handle_t;
+
+static servo_handle_t servo_data;
 
 /**
- * 将角度映射到脉冲宽度
- * @param angle 0-180度
- * @return 对应的脉冲宽度(微秒)
+ * @brief 裁剪值到指定范围
+ * @param value 值
+ * @param min 最小值
+ * @param max 最大值
+ * @return float 裁剪后的值
  */
-uint32_t angle_to_pulse_width(uint8_t angle) {
-    return SERVO_MIN_PULSE_WIDTH + (angle * (SERVO_MAX_PULSE_WIDTH - SERVO_MIN_PULSE_WIDTH) / 180);
+static inline float CLAMP(float value, float min, float max) {
+    return value < min ? min : (value > max ? max : value);
 }
 
 /**
- * 将角度映射到LEDC占空比
- * @param angle 0-180度
- * @param max_duty 最大占空比值
- * @return 对应的占空比值
+ * @brief 启动自动停止定时器
+ * @param milliseconds 延迟时间(毫秒)
+ * @return esp_err_t ESP_OK on success
  */
-uint32_t angle_to_duty(uint8_t angle, uint32_t max_duty) {
-    uint32_t pulse_width = angle_to_pulse_width(angle);
-    return (pulse_width * max_duty) / ((uint32_t)(1000000 / SERVO_FREQ));
+static esp_err_t start_auto_stop_timer(uint32_t milliseconds) {
+    if (servo_data.auto_stop_timer != NULL) {
+        // 停止之前的定时器
+        xTimerStop(servo_data.auto_stop_timer, portMAX_DELAY);
+    }
+    
+    // 创建新的定时器
+    servo_data.auto_stop_timer = xTimerCreate(
+        "ServoAutoStop",
+        pdMS_TO_TICKS(milliseconds),
+        pdFALSE,  // 单次定时器
+        (void*)0,
+        auto_stop_timer_callback
+    );
+    
+    if (servo_data.auto_stop_timer == NULL) {
+        ESP_LOGE(TAG, "Failed to create auto-stop timer");
+        return ESP_FAIL;
+    }
+    
+    // 启动定时器
+    if (xTimerStart(servo_data.auto_stop_timer, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to start auto-stop timer");
+        return ESP_FAIL;
+    }
+    
+    return ESP_OK;
 }
 
 /**
- * 初始化舵机
- * @param servo 舵机结构体指针
- * @param gpio_pin GPIO引脚号
- * @param channel LEDC通道号
- * @return 成功返回ESP_OK
+ * @brief 自动停止定时器回调函数
+ * @param xTimer 定时器句柄
  */
-esp_err_t servo_init(servo_t *servo, uint8_t gpio_pin, ledc_channel_t channel) {
-    if (!servo) return ESP_ERR_INVALID_ARG;
-    
-    servo->pin = gpio_pin;
-    servo->channel = channel;
-    servo->timer = LEDC_TIMER_0;
-    
-    // 使用12位分辨率(0-4095)
-    ledc_timer_config_t timer_conf = {
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .duty_resolution = LEDC_TIMER_12_BIT,
-        .timer_num = servo->timer,
-        .freq_hz = SERVO_FREQ,
+static void auto_stop_timer_callback(TimerHandle_t xTimer) {
+    ESP_LOGI(TAG, "Auto-stop timer expired, stopping servo");
+    servo_stop();
+}
+
+/**
+ * @brief 配置LEDC定时器和通道
+ * @param gpio_num GPIO引脚号
+ * @return esp_err_t ESP_OK on success
+ */
+static esp_err_t ledc_init(uint32_t gpio_num) {
+    // 配置LEDC定时器
+    ledc_timer_config_t timer_config = {
+        .duty_resolution = LEDC_TIMER_13_BIT,    // 13位分辨率 (0-8191)
+        .freq_hz = 50,                          // 50Hz频率 (20ms周期)
+        .timer_num = SERVO_LEDC_TIMER,
         .clk_cfg = LEDC_AUTO_CLK,
     };
     
-    ledc_channel_config_t channel_conf = {
-        .gpio_num = gpio_pin,
+    ESP_LOGI(TAG, "Configuring LEDC timer %d with 50Hz frequency", SERVO_LEDC_TIMER);
+    esp_err_t ret = ledc_timer_config(&timer_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure LEDC timer: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // 配置LEDC通道
+    ledc_channel_config_t channel_config = {
+        .channel    = SERVO_LEDC_CHANNEL,
+        .duty       = 0,
+        .gpio_num   = gpio_num,
         .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = channel,
-        .timer_sel = servo->timer,
-        .duty = 0,
-        .hpoint = 0
+        .timer_sel  = SERVO_LEDC_TIMER,
+        .hpoint     = 0,
     };
     
-    // 初始化定时器和通道
-    ledc_timer_config(&timer_conf);
-    ledc_channel_config(&channel_conf);
+    ESP_LOGI(TAG, "Configuring LEDC channel %d on GPIO %d", SERVO_LEDC_CHANNEL, gpio_num);
+    ret = ledc_channel_config(&channel_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure LEDC channel: %s", esp_err_to_name(ret));
+        return ret;
+    }
     
     return ESP_OK;
 }
 
 /**
- * 设置舵机角度
- * @param servo 舵机结构体指针
- * @param angle 0-180度
- * @return 成功返回ESP_OK
+ * @brief 将速度值转换为脉冲宽度
+ * @param speed 速度值 (-1.0 ~ 1.0)
+ * @return uint32_t 脉冲宽度(微秒)
  */
-esp_err_t servo_set_angle(servo_t *servo, uint8_t angle) {
-    if (!servo || angle > 180) return ESP_ERR_INVALID_ARG;
+static uint32_t speed_to_pulse_width(float speed) {
+    float pulse_us;
     
-    uint32_t max_duty = (1 << 12) - 1;  // 12位分辨率的最大值
-    uint32_t duty = angle_to_duty(angle, max_duty);
+    if (speed >= 0.0f) {
+        // 正向速度: 0.0 ~ 1.0 -> 1500 ~ 500μs
+        pulse_us = SERVO_MIN_PULSE_US + (SERVO_NEUTRAL_PULSE_US - SERVO_MIN_PULSE_US) * (1.0f - speed);
+    } else {
+        // 反向速度: -1.0 ~ 0.0 -> 2500 ~ 1500μs
+        pulse_us = SERVO_MAX_PULSE_US + (SERVO_NEUTRAL_PULSE_US - SERVO_MAX_PULSE_US) * (1.0f + speed);
+    }
     
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, servo->channel, duty);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, servo->channel);
+    // 限制在有效范围内
+    pulse_us = CLAMP(pulse_us, SERVO_MIN_PULSE_US, SERVO_MAX_PULSE_US);
+    
+    return (uint32_t)pulse_us;
+}
+
+/**
+ * @brief 将脉冲宽度转换为LEDC占空比
+ * @param pulse_us 脉冲宽度(微秒)
+ * @return uint32_t LEDC占空比值
+ */
+static uint32_t servo_pulse_to_duty(uint32_t pulse_us) {
+    return (pulse_us * (1 << LEDC_TIMER_13_BIT)) / SERVO_PERIOD_US;
+}
+
+/**
+ * @brief 初始化360度电机控制
+ * @param channel LEDC通道号
+ * @param gpio_num 电机信号输出的GPIO引脚
+ * @return esp_err_t ESP_OK on success
+ */
+ esp_err_t servo_init(ledc_channel_t channel, gpio_num_t gpio_num) {
+    if (servo_data.initialized) {
+        ESP_LOGW(TAG, "Servo already initialized");
+        return ESP_OK;
+    }
+    
+    // 保存配置
+    servo_data.channel = channel;
+    servo_data.gpio_num = gpio_num;
+    
+    ESP_LOGI(TAG, "Initializing servo motor on channel %d, GPIO %d", channel, gpio_num);
+    
+    // 初始化LEDC硬件
+    esp_err_t ret = ledc_init(gpio_num);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    // 初始化完成
+    servo_data.initialized = true;
+    
+    // 默认停止电机
+    ret = servo_stop();
+    
+    ESP_LOGI(TAG, "Servo motor initialized successfully");
+    return ret;
+}
+
+/**
+ * @brief 设置电机速度
+ * @param speed 速度值 (-1.0 ~ 1.0)
+ * @return esp_err_t ESP_OK on success
+ */
+ esp_err_t servo_set_speed(float speed) {
+    if (!servo_data.initialized) {
+        ESP_LOGE(TAG, "Servo not initialized");
+        return ESP_ERR_NOT_FINISHED;
+    }
+    
+    // 裁剪速度值
+    speed = CLAMP(speed, -1.0f, 1.0f);
+    
+    uint32_t pulse_us = speed_to_pulse_width(speed);
+    uint32_t duty = servo_pulse_to_duty(pulse_us);
+    
+    ESP_LOGD(TAG, "Setting servo speed to %.2f, pulse %uum, duty %u", speed, pulse_us, duty);
+    
+    // 设置占空比
+    return ledc_set_duty(LEDC_LOW_SPEED_MODE, servo_data.channel, duty);
+}
+
+/**
+ * @brief 设置电机方向速度
+ * @param direction 电机方向
+ * @param speed 速度系数 (0.0 ~ 1.0)
+ * @return esp_err_t ESP_OK on success
+ */
+ esp_err_t servo_set_direction_speed(servo_direction_t direction, float speed) {
+    if (!servo_data.initialized) {
+        ESP_LOGE(TAG, "Servo not initialized");
+        return ESP_ERR_NOT_FINISHED;
+    }
+    
+    speed = CLAMP(speed, 0.0f, 1.0f);
+    
+    float final_speed = (direction == SERVO_FORWARD) ? speed : -speed;
+    
+    return servo_set_speed(final_speed);
+}
+
+/**
+ * @brief 电机正向旋转指定时间
+ * @param milliseconds 正向旋转时间(毫秒)
+ * @return esp_err_t ESP_OK on success
+ */
+ esp_err_t servo_forward_for_time(uint32_t milliseconds) {
+    if (!servo_data.initialized) {
+        ESP_LOGE(TAG, "Servo not initialized");
+        return ESP_ERR_NOT_FINISHED;
+    }
+    
+    ESP_LOGI(TAG, "Starting servo forward rotation for %u ms", milliseconds);
+    
+    // 启动正向旋转
+    esp_err_t ret = servo_set_direction_speed(SERVO_FORWARD, 1.0f);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    // 启动自动停止定时器
+    ret = start_auto_stop_timer(milliseconds);
+    if (ret != ESP_OK) {
+        // 如果定时器创建失败，提醒用户手动停止
+        ESP_LOGW(TAG, "Auto-stop timer failed, please call servo_stop() manually");
+    }
     
     return ESP_OK;
 }
 
 /**
- * 将舵机移动到90度
- * @return 成功返回ESP_OK
+ * @brief 停止电机
+ * @return esp_err_t ESP_OK on success
  */
-void servo_move_to_90_degrees(void) {
-    servo_t servo;
-    esp_err_t err;
-    
-    // 初始化舵机
-    err = servo_init(&servo, SERVO_PIN, LEDC_CHANNEL_0);
-    if (err != ESP_OK) {
-        return;
+ esp_err_t servo_stop(void) {
+    if (!servo_data.initialized) {
+        ESP_LOGE(TAG, "Servo not initialized");
+        return ESP_ERR_NOT_FINISHED;
     }
     
-    // 移动到90度
-    err = servo_set_angle(&servo, 90);
-    if (err != ESP_OK) {
-        return;
+    // 停止自动停止定时器
+    if (servo_data.auto_stop_timer != NULL) {
+        xTimerStop(servo_data.auto_stop_timer, 0);
+        xTimerDelete(servo_data.auto_stop_timer, 0);
+        servo_data.auto_stop_timer = NULL;
     }
+    
+    // 设置中立位置(停止)
+    uint32_t duty = servo_pulse_to_duty(SERVO_NEUTRAL_PULSE_US);
+    esp_err_t ret = ledc_set_duty(LEDC_LOW_SPEED_MODE, servo_data.channel, duty);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Servo motor stopped");
+    }
+    
+    return ret;
 }
 
 /**
- * 将舵机移动到指定角度
- * @param angle 0-180度
- * @return 成功返回ESP_OK
+ * @brief 清理电机控制资源
+ * @return esp_err_t ESP_OK on success
  */
-void servo_move_to_angle(uint8_t angle) {
-    servo_t servo;
-    esp_err_t err;
-    
-    // 初始化舵机
-    err = servo_init(&servo, SERVO_PIN, LEDC_CHANNEL_0);
-    if (err != ESP_OK) {
-        return;
+ esp_err_t servo_deinit(void) {
+    if (!servo_data.initialized) {
+        ESP_LOGW(TAG, "Servo not initialized");
+        return ESP_OK;
     }
     
-    // 移动到指定角度
-    err = servo_set_angle(&servo, angle);
-    if (err != ESP_OK) {
-        return;
+    // 停止电机
+    servo_stop();
+    
+    // 清理定时器
+    if (servo_data.auto_stop_timer != NULL) {
+        xTimerDelete(servo_data.auto_stop_timer, 0);
+        servo_data.auto_stop_timer = NULL;
     }
+    
+    // 清理LEDC通道
+    ledc_stop(LEDC_LOW_SPEED_MODE, servo_data.channel, false);
+    
+    // 重置状态
+    servo_data.initialized = false;
+    
+    ESP_LOGI(TAG, "Servo motor deinitialized");
+    return ESP_OK;
 }
