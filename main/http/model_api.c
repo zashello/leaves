@@ -69,7 +69,7 @@ static void http_post_request(void)
         "\"messages\": ["
             "{"
                 "\"role\": \"user\","
-                "\"content\": \"写一篇散文\""//填入问题内容
+                "\"content\": \"分析植物状态\""//填入问题内容
             "}"
         "],"
         "\"max_tokens\": 512,"
