@@ -194,7 +194,7 @@ static uint32_t speed_to_pulse_width(float speed) {
     
     // 裁剪速度值
     speed = CLAMP(speed, -1.0f, 1.0f);
-    
+     
     uint32_t pulse_us = speed_to_pulse_width(speed);
     uint32_t duty = servo_pulse_to_duty(pulse_us);
     
