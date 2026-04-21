@@ -43,7 +43,11 @@ void sevro(void* param){
     ESP_LOGI("APP", "Application completed");
 
 }
+void ai(void* prama){
+    void AI_test(void);
+}
 
 void app_main(void) {
     xTaskCreate(sevro,"servo",2048,NULL,3,NULL);
+    xTaskCreate(ai,"ai",2048,NULL,2,NULL);
 }
