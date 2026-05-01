@@ -4,6 +4,10 @@
 #include "freertos/FreeRTOS.h"
 #include "esp_app_trace.h"
 #include "esp_log.h"
+#include "sensor/sensor.h"
+#include "http/model_api.h"
+#include "wifi/wifi_connect.h"
+
 
 void sevro(void* param){
 
@@ -44,10 +48,12 @@ void sevro(void* param){
 
 }
 void ai(void* prama){
-    void AI_test(void);
+    ESP_LOGI("APP", "启动AI分析任务");
+    AI_test();
+    vTaskDelete(NULL);
 }
 
 void app_main(void) {
-    xTaskCreate(sevro,"servo",2048,NULL,3,NULL);
-    xTaskCreate(ai,"ai",2048,NULL,2,NULL);
+    wifi_init_sta();
+    xTaskCreate(ai,"ai",8192,NULL,2,NULL);
 }

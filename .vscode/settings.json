@@ -13,5 +13,6 @@
     "--query-driver=**",
     "--compile-commands-dir=d:\\workspaces\\scm\\esp32\\leaves\\build"
   ],
-  "idf.flashType": "JTAG"
+  "idf.flashType": "UART",
+  "idf.portWin": "COM9"
 }
