@@ -19,7 +19,7 @@ static const char *TAG = "leaf_spectrum";
 
 #define SENSOR_I2C_SCL    5
 #define SENSOR_I2C_SDA    4
-#define SENSOR_I2C_FREQ   400000
+#define SENSOR_I2C_FREQ   100000
 
 static i2c_master_bus_handle_t g_i2c_bus = NULL;
 static as7341_handle_t g_as7341 = NULL;
@@ -31,6 +31,9 @@ esp_err_t sensor_init(void)
         return ESP_OK;
     }
 
+    ESP_LOGI(TAG, "初始化AS7341: SCL=GPIO%d, SDA=GPIO%d, 频率=%dHz",
+             SENSOR_I2C_SCL, SENSOR_I2C_SDA, SENSOR_I2C_FREQ);
+
     i2c_master_bus_config_t bus_config = {
         .i2c_port = I2C_NUM_0,
         .scl_io_num = SENSOR_I2C_SCL,
@@ -40,16 +43,16 @@ esp_err_t sensor_init(void)
     };
     esp_err_t ret = i2c_new_master_bus(&bus_config, &g_i2c_bus);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "I2C总线创建失败: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "I2C总线创建失败: %s (0x%x)", esp_err_to_name(ret), ret);
         return ret;
     }
 
     as7341_config_t as7341_config = {
         .i2c_address = I2C_AS7341_DEV_ADDR,
         .i2c_clock_speed = SENSOR_I2C_FREQ,
-        .atime = 100,
+        .spectral_gain = AS7341_SPECTRAL_GAIN_32X,
+        .atime = 29,
         .astep = 599,
-        .spectral_gain = AS7341_SPECTRAL_GAIN_16X,
     };
     ret = as7341_init(g_i2c_bus, &as7341_config, &g_as7341);
     if (ret != ESP_OK) {
@@ -88,6 +91,20 @@ esp_err_t sensor_read_data(as7341_channels_spectral_data_t *data)
     if (g_as7341 == NULL) {
         ESP_LOGE(TAG, "传感器未初始化");
         return ESP_FAIL;
+    }
+
+    as7341_astatus_register_t astatus;
+    as7341_status2_register_t status2;
+    esp_err_t sret = as7341_get_astatus_register(g_as7341, &astatus);
+    if (sret == ESP_OK) {
+        ESP_LOGI(TAG, "传感器状态: 饱和=%d, 增益=%d",
+                 astatus.bits.asat_status, astatus.bits.again_status);
+    }
+    sret = as7341_get_status2_register(g_as7341, &status2);
+    if (sret == ESP_OK) {
+        ESP_LOGI(TAG, "STATUS2: 模拟饱和=%d, 数字饱和=%d, 数据有效=%d",
+                 status2.bits.analog_saturation, status2.bits.digital_saturation,
+                 status2.bits.spectral_valid);
     }
 
     bool ready = false;

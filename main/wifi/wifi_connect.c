@@ -6,94 +6,90 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "config/nvs_config.h"
 
-// 定义 WiFi 凭据
-#define WIFI_SSID      "Gs24"
-#define WIFI_PASS      "Zsh.12345678"
-
-// 事件组句柄，用于在连接成功后通知主线程
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 
 static const char *TAG = "WiFi Station";
 
-// 事件处理函数：监听 Wi-Fi 和 IP 事件
-static void event_handler(void* arg, esp_event_base_t event_base,
-                          int32_t event_id, void* event_data) {
+static void event_handler(void *arg, esp_event_base_t event_base,
+                          int32_t event_id, void *event_data)
+{
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        esp_wifi_connect(); // 断开后自动重连
+        esp_wifi_connect();
         ESP_LOGI(TAG, "重试连接 WiFi...");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "获取 IP 地址:" IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
-void wifi_init_sta(void) {
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+esp_err_t wifiConnectWithConfig(const device_config_t *config)
+{
+    if (config == NULL || strlen(config->wifiSsid) == 0) {
+        ESP_LOGE(TAG, "无效的WiFi配置");
+        return ESP_ERR_INVALID_ARG;
     }
-    ESP_ERROR_CHECK(ret);
 
     s_wifi_event_group = xEventGroupCreate();
     if (s_wifi_event_group == NULL) {
         ESP_LOGE(TAG, "事件组创建失败");
-        return;
+        return ESP_FAIL;
     }
 
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_init();
+    esp_event_loop_create_default();
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
+    esp_event_handler_instance_t instanceAnyId;
+    esp_event_handler_instance_t instanceGotIp;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
                                                         &event_handler,
                                                         NULL,
-                                                        &instance_any_id));
+                                                        &instanceAnyId));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_STA_GOT_IP,
                                                         &event_handler,
                                                         NULL,
-                                                        &instance_got_ip));
+                                                        &instanceGotIp));
 
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = WIFI_SSID,
-            .password = WIFI_PASS,
-        },
-    };
+    wifi_config_t wifiConfig = {0};
+    strncpy((char *)wifiConfig.sta.ssid, config->wifiSsid, sizeof(wifiConfig.sta.ssid) - 1);
+    strncpy((char *)wifiConfig.sta.password, config->wifiPass, sizeof(wifiConfig.sta.password) - 1);
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "WiFi 初始化完成。");
+    ESP_LOGI(TAG, "WiFi初始化完成，正在连接: %s", config->wifiSsid);
+    return ESP_OK;
 }
 
-void wifi_wait_connected(void) {
+bool wifiWaitConnected(uint32_t timeoutMs)
+{
     if (s_wifi_event_group == NULL) {
-        ESP_LOGE(TAG, "WiFi 未初始化，无法等待连接");
-        return;
+        ESP_LOGE(TAG, "WiFi未初始化");
+        return false;
     }
     EventBits_t bits = xEventGroupWaitBits(
         s_wifi_event_group,
         WIFI_CONNECTED_BIT,
         pdFALSE,
         pdTRUE,
-        pdMS_TO_TICKS(30000)
+        pdMS_TO_TICKS(timeoutMs)
     );
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "WiFi 已连接");
-    } else {
-        ESP_LOGW(TAG, "WiFi 连接超时");
+        ESP_LOGI(TAG, "WiFi已连接");
+        return true;
     }
+    ESP_LOGW(TAG, "WiFi连接超时");
+    return false;
 }

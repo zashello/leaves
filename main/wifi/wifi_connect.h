@@ -1,4 +1,7 @@
 #pragma once
 
-void wifi_init_sta(void);
-void wifi_wait_connected(void);
+#include <stdbool.h>
+#include "config/nvs_config.h"
+
+esp_err_t wifiConnectWithConfig(const device_config_t *config);
+bool wifiWaitConnected(uint32_t timeoutMs);
