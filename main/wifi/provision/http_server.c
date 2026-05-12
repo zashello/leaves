@@ -57,6 +57,11 @@ static esp_err_t configGetHandler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "ssid", config.wifiSsid);
     cJSON_AddStringToObject(root, "sfKey", config.siliconflowKey);
     cJSON_AddStringToObject(root, "scKey", config.serverchanKey);
+    cJSON_AddStringToObject(root, "mqttServer", config.mqttServer);
+    cJSON_AddNumberToObject(root, "mqttPort", config.mqttPort);
+    cJSON_AddStringToObject(root, "mqttUser", config.mqttUsername);
+    cJSON_AddStringToObject(root, "mqttPass", config.mqttPassword);
+    cJSON_AddStringToObject(root, "deviceName", config.deviceName);
 
     char *jsonStr = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -108,12 +113,49 @@ static esp_err_t saveHandler(httpd_req_t *req)
         strncpy(config.serverchanKey, item->valuestring, sizeof(config.serverchanKey) - 1);
     }
 
+    item = cJSON_GetObjectItem(root, "mqttServer");
+    if (item && cJSON_IsString(item)) {
+        strncpy(config.mqttServer, item->valuestring, sizeof(config.mqttServer) - 1);
+    }
+
+    item = cJSON_GetObjectItem(root, "mqttPort");
+    if (item && cJSON_IsNumber(item)) {
+        config.mqttPort = (uint16_t)item->valueint;
+    } else {
+        config.mqttPort = 1883;
+    }
+
+    item = cJSON_GetObjectItem(root, "mqttUser");
+    if (item && cJSON_IsString(item)) {
+        strncpy(config.mqttUsername, item->valuestring, sizeof(config.mqttUsername) - 1);
+    }
+
+    item = cJSON_GetObjectItem(root, "mqttPass");
+    if (item && cJSON_IsString(item)) {
+        strncpy(config.mqttPassword, item->valuestring, sizeof(config.mqttPassword) - 1);
+    }
+
+    item = cJSON_GetObjectItem(root, "deviceName");
+    if (item && cJSON_IsString(item)) {
+        strncpy(config.deviceName, item->valuestring, sizeof(config.deviceName) - 1);
+    } else {
+        strncpy(config.deviceName, "leaves_device", sizeof(config.deviceName) - 1);
+    }
+
     cJSON_Delete(root);
 
     if (strlen(config.wifiSsid) == 0 || strlen(config.siliconflowKey) == 0 || strlen(config.serverchanKey) == 0) {
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"必填字段不能为空\"}");
         return ESP_FAIL;
+    }
+
+    if (config.mqttPort == 0) {
+        config.mqttPort = 1883;
+    }
+
+    if (strlen(config.deviceName) == 0) {
+        strncpy(config.deviceName, "leaves_device", sizeof(config.deviceName) - 1);
     }
 
     config.configValid = true;

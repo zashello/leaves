@@ -16,3 +16,4 @@ dependencies:
   #   public: true
   espressif/cjson: ^1.7.15
   k0i05/esp_as7341: ^1.2.7
+  espressif/mqtt: '*'

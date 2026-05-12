@@ -10,6 +10,11 @@ static const char *KEY_WIFI_SSID = "wifi_ssid";
 static const char *KEY_WIFI_PASS = "wifi_pass";
 static const char *KEY_SF_KEY = "sf_key";
 static const char *KEY_SC_KEY = "sc_key";
+static const char *KEY_MQTT_SERVER = "mqtt_server";
+static const char *KEY_MQTT_PORT = "mqtt_port";
+static const char *KEY_MQTT_USER = "mqtt_user";
+static const char *KEY_MQTT_PASS = "mqtt_pass";
+static const char *KEY_DEVICE_NAME = "device_name";
 static const char *KEY_VALID = "cfg_valid";
 
 esp_err_t configInit(void)
@@ -67,6 +72,20 @@ esp_err_t configLoad(device_config_t *config)
     len = sizeof(config->serverchanKey);
     nvs_get_str(handle, KEY_SC_KEY, config->serverchanKey, &len);
 
+    len = sizeof(config->mqttServer);
+    nvs_get_str(handle, KEY_MQTT_SERVER, config->mqttServer, &len);
+
+    nvs_get_u16(handle, KEY_MQTT_PORT, &config->mqttPort);
+
+    len = sizeof(config->mqttUsername);
+    nvs_get_str(handle, KEY_MQTT_USER, config->mqttUsername, &len);
+
+    len = sizeof(config->mqttPassword);
+    nvs_get_str(handle, KEY_MQTT_PASS, config->mqttPassword, &len);
+
+    len = sizeof(config->deviceName);
+    nvs_get_str(handle, KEY_DEVICE_NAME, config->deviceName, &len);
+
     config->configValid = true;
     nvs_close(handle);
 
@@ -97,6 +116,21 @@ esp_err_t configSave(const device_config_t *config)
     if (ret != ESP_OK) goto save_err;
 
     ret = nvs_set_str(handle, KEY_SC_KEY, config->serverchanKey);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_str(handle, KEY_MQTT_SERVER, config->mqttServer);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_u16(handle, KEY_MQTT_PORT, config->mqttPort);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_str(handle, KEY_MQTT_USER, config->mqttUsername);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_str(handle, KEY_MQTT_PASS, config->mqttPassword);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_str(handle, KEY_DEVICE_NAME, config->deviceName);
     if (ret != ESP_OK) goto save_err;
 
     ret = nvs_set_u8(handle, KEY_VALID, 1);

@@ -144,8 +144,28 @@ char* sensor_data_to_json(const as7341_channels_spectral_data_t *data)
     if (data == NULL) return NULL;
 
     float ndvi = 0.0f;
-    if ((data->f8 + data->nir) != 0) {
-        ndvi = (float)(data->nir - data->f8) / (float)(data->nir + data->f8);
+    if ((data->f8 + data->f5) != 0) {
+        ndvi = (float)(data->f8 - data->f5) / (float)(data->f8 + data->f5);
+    }
+
+    float sipi = 0.0f;
+    if ((data->nir - data->f7) != 0) {
+        sipi = (float)(data->nir - data->f2) / (float)(data->nir - data->f7);
+    }
+
+    float psri = 0.0f;
+    if (data->f8 != 0) {
+        psri = (float)(data->f7 - data->f5) / (float)data->f8;
+    }
+
+    float cri550 = 0.0f;
+    if (data->f3 != 0 && data->f5 != 0) {
+        cri550 = (1.0f / (float)data->f3) - (1.0f / (float)data->f5);
+    }
+
+    float cri700 = 0.0f;
+    if (data->f3 != 0 && data->f8 != 0) {
+        cri700 = (1.0f / (float)data->f3) - (1.0f / (float)data->f8);
     }
 
     cJSON *root = cJSON_CreateObject();
@@ -162,6 +182,10 @@ char* sensor_data_to_json(const as7341_channels_spectral_data_t *data)
     cJSON_AddNumberToObject(root, "clear", data->clear);
     cJSON_AddNumberToObject(root, "nir", data->nir);
     cJSON_AddNumberToObject(root, "ndvi", ndvi);
+    cJSON_AddNumberToObject(root, "sipi", sipi);
+    cJSON_AddNumberToObject(root, "psri", psri);
+    cJSON_AddNumberToObject(root, "cri550", cri550);
+    cJSON_AddNumberToObject(root, "cri700", cri700);
 
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
