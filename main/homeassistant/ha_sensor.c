@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "cJSON.h"
 #include "config/nvs_config.h"
+#include "hardware/scd41.h"
 
 static const char *TAG = "HA_SENSOR";
 
@@ -109,6 +110,14 @@ void sensorTask(void *param) {
         ha_sensor_publish_data(&sensor_data);
         sensor_deinit();
 
+        scd41_data_t scd_data;
+        ret = scd41_read_data(&scd_data);
+        if (ret == ESP_OK && scd_data.data_valid) {
+            ha_sensor_publish_scd41_data(&scd_data);
+        } else {
+            ESP_LOGW(TAG, "SCD41数据读取失败，跳过本次上报");
+        }
+
         ESP_LOGI(TAG, "传感器数据已上报");
     }
 
@@ -173,6 +182,10 @@ esp_err_t ha_sensor_publish_discovery(void) {
     publishSensorDiscovery("psri", "Plant PSRI", NULL, NULL);
     publishSensorDiscovery("cri550", "Plant CRI550", NULL, NULL);
     publishSensorDiscovery("cri700", "Plant CRI700", NULL, NULL);
+
+    publishSensorDiscovery("co2", "CO2 Concentration", "carbon_dioxide", "ppm");
+    publishSensorDiscovery("temperature", "Temperature", "temperature", "°C");
+    publishSensorDiscovery("humidity", "Humidity", "humidity", "%");
 
     ESP_LOGI(TAG, "所有传感器发现配置已发布");
     return ESP_OK;
@@ -274,5 +287,35 @@ esp_err_t ha_sensor_publish_data(as7341_channels_spectral_data_t *data) {
     ha_mqtt_publish(topic, value_str, 1, 1);
 
     ESP_LOGI(TAG, "传感器数据发布完成");
+    return ESP_OK;
+}
+
+esp_err_t ha_sensor_publish_scd41_data(const scd41_data_t *data) {
+    if (data == NULL || !data->data_valid) {
+        ESP_LOGE(TAG, "无效的SCD41传感器数据");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    device_config_t config;
+    if (configLoad(&config) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    char topic[64];
+    char value_str[32];
+
+    snprintf(topic, sizeof(topic), "%s/sensor/co2", MQTT_SENSOR_BASE_TOPIC);
+    snprintf(value_str, sizeof(value_str), "%u", data->co2_ppm);
+    ha_mqtt_publish(topic, value_str, 1, 1);
+
+    snprintf(topic, sizeof(topic), "%s/sensor/temperature", MQTT_SENSOR_BASE_TOPIC);
+    snprintf(value_str, sizeof(value_str), "%.2f", data->temperature_c);
+    ha_mqtt_publish(topic, value_str, 1, 1);
+
+    snprintf(topic, sizeof(topic), "%s/sensor/humidity", MQTT_SENSOR_BASE_TOPIC);
+    snprintf(value_str, sizeof(value_str), "%.2f", data->humidity_rh);
+    ha_mqtt_publish(topic, value_str, 1, 1);
+
+    ESP_LOGI(TAG, "SCD41传感器数据发布完成");
     return ESP_OK;
 }

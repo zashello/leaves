@@ -8,6 +8,7 @@
 #include "cJSON.h"
 #include "model_api.h"
 #include "hardware/sensor.h"
+#include "hardware/scd41.h"
 #include "config/nvs_config.h"
 
 #define MAX_HTTP_OUTPUT_BUFFER 8192
@@ -195,9 +196,23 @@ static void httpPostRequest(void)
     ESP_LOGI(TAG, "传感器JSON: %s", sensorJson);
 
     char aiPrompt[1024];
-    snprintf(aiPrompt, sizeof(aiPrompt),
-        "光谱传感器数据：\n%s\n\n请根据以上光谱数据分析植物状态(包括健康度、营养状况、光照适应性等),并给出照料建议",
-        sensorJson);
+    int promptLen = snprintf(aiPrompt, sizeof(aiPrompt),
+        "光谱传感器数据：\n%s\n", sensorJson);
+
+    scd41_data_t scd_data;
+    esp_err_t scdRet = scd41_read_data(&scd_data);
+    if (scdRet == ESP_OK && scd_data.data_valid) {
+        promptLen += snprintf(aiPrompt + promptLen, sizeof(aiPrompt) - promptLen,
+            "\n环境传感器数据：\nCO2: %uppm\n温度: %.1f°C\n湿度: %.1f%%RH\n",
+            scd_data.co2_ppm, scd_data.temperature_c, scd_data.humidity_rh);
+    } else {
+        ESP_LOGW(TAG, "SCD41数据读取失败，AI分析仅使用光谱数据");
+        promptLen += snprintf(aiPrompt + promptLen, sizeof(aiPrompt) - promptLen,
+            "\n环境传感器数据：不可用\n");
+    }
+
+    snprintf(aiPrompt + promptLen, sizeof(aiPrompt) - promptLen,
+        "\n请根据以上全部传感器数据分析植物状态(包括健康度、营养状况、光照适应性、环境适宜度等),并给出照料建议");
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "model", "Qwen/Qwen3-VL-30B-A3B-Instruct");

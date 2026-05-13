@@ -13,6 +13,7 @@
 #include "homeassistant/ha_mqtt.h"
 #include "homeassistant/ha_sensor.h"
 #include "homeassistant/ha_service.h"
+#include "hardware/scd41.h"
 
 static const char *TAG = "APP";
 
@@ -73,6 +74,13 @@ void app_main(void)
             ha_sensor_start();
 
             xTaskCreate(aiTask, "ai", 8192, NULL, 2, NULL);
+
+            ret = scd41_init();
+            if (ret != ESP_OK) {
+                ESP_LOGW(TAG, "SCD41初始化失败，CO2/温湿度传感器不可用");
+            } else {
+                ESP_LOGI(TAG, "SCD41初始化成功");
+            }
         } else {
             ESP_LOGE(TAG, "WiFi连接初始化失败，进入配网模式");
             provisionStart();
