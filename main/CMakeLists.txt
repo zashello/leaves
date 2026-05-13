@@ -1,17 +1,45 @@
-idf_component_register(SRCS "main.c"
-                             "hardware/servo.c"
-                             "hardware/button.c"
-                             "hardware/scd41.c"
-                             "http/model_api.c"
-                             "wifi/wifi_connect.c"
-                             "wifi/provision/provision.c"
-                             "wifi/provision/http_server.c"
-                             "wifi/provision/captive_portal.c"
-                             "config/nvs_config.c"
-                             "hardware/sensor.c"
-                             "homeassistant/ha_mqtt.c"
-                             "homeassistant/ha_sensor.c"
-                             "homeassistant/ha_service.c"
-                    INCLUDE_DIRS "." "./homeassistant"
-                     REQUIRES esp_driver_ledc esp_driver_gpio app_trace nvs_flash esp_event esp_http_client esp_http_server lwip esp_netif
-                     esp_wifi driver)
+idf_component_register(
+    SRCS
+        "main.c"
+        "core/app_state.c"
+        "core/task_manager.c"
+        "core/event_bus.c"
+        "driver/driver_as7341.c"
+        "driver/driver_scd41.c"
+        "driver/driver_button.c"
+        "storage/storage.c"
+        "network/wifi_sta.c"
+        "network/mqtt_client.c"
+        "network/provision/prov_main.c"
+        "network/provision/prov_http.c"
+        "network/provision/prov_dns.c"
+        "service/sensor_service.c"
+        "service/ai_service.c"
+        "service/ha_integration.c"
+        "service/notify.c"
+        "tasks/task_provision.c"
+        "tasks/task_network.c"
+        "tasks/task_sensor.c"
+        "tasks/task_ai.c"
+    INCLUDE_DIRS
+        "."
+        "./core"
+        "./driver"
+        "./storage"
+        "./network"
+        "./network/provision"
+        "./service"
+        "./tasks"
+    REQUIRES
+        esp_driver_ledc
+        esp_driver_gpio
+        app_trace
+        nvs_flash
+        esp_event
+        esp_http_client
+        esp_http_server
+        lwip
+        esp_netif
+        esp_wifi
+        driver
+)
