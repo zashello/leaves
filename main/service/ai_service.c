@@ -265,12 +265,17 @@ static void aiHttpTask(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+static bool s_sntpInited = false;
+
 void aiServiceRun(void)
 {
-    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    esp_sntp_setservername(0, "pool.ntp.org");
-    esp_sntp_setservername(1, "time.nist.gov");
-    esp_sntp_init();
+    if (!s_sntpInited) {
+        esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+        esp_sntp_setservername(0, "pool.ntp.org");
+        esp_sntp_setservername(1, "time.nist.gov");
+        esp_sntp_init();
+        s_sntpInited = true;
+    }
 
     int retry = 0;
     const int retryCount = 10;

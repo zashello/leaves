@@ -43,6 +43,8 @@
 #define MQTT_STATE_TOPIC       "leaves/status"
 #define MQTT_LWT_OFFLINE       "offline"
 #define MQTT_LWT_ONLINE        "online"
+#define MQTT_COMMAND_TOPIC     "device/esp32/command"
+#define MQTT_COMMAND_RESULT    "device/esp32/command/result"
 #define MQTT_TRIGGER_TOPIC     "leaves/trigger_ai"
 #define MQTT_TRIGGER_RESULT    "leaves/trigger_ai/result"
 #define MQTT_RECONNECT_MS      5000

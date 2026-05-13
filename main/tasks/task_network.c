@@ -50,6 +50,7 @@ void taskNetwork(void *param)
 
     haIntegrationStart();
     haIntegrationSetAiCallback(aiServiceRun);
+    haIntegrationSetSensorCallback(sensorServiceReportOnce);
 
     sensorServiceStart();
 

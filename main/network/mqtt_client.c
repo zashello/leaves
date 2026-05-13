@@ -26,6 +26,7 @@ static void mqttEventHandler(void *handler_args, esp_event_base_t base, int32_t 
             g_state = MQTT_STATE_CONNECTED;
             esp_mqtt_client_publish(event->client, MQTT_STATE_TOPIC, MQTT_LWT_ONLINE, 0, 1, 1);
             esp_mqtt_client_subscribe(event->client, MQTT_TRIGGER_TOPIC, 1);
+            esp_mqtt_client_subscribe(event->client, MQTT_COMMAND_TOPIC, 1);
             eventBusPublish(EVENT_MQTT_CONNECTED, NULL, 0);
             break;
 

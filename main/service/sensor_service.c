@@ -224,3 +224,37 @@ esp_err_t sensorServicePublishEnvironmentData(const scd41_data_t *data)
 
     return ESP_OK;
 }
+
+void sensorServiceReportOnce(void)
+{
+    if (!mqttClientIsConnected()) {
+        ESP_LOGW(TAG, "MQTT未连接，无法立即上报");
+        return;
+    }
+
+    ESP_LOGI(TAG, "立即采集传感器数据并上报");
+
+    esp_err_t ret = as7341Init();
+    if (ret == ESP_OK) {
+        as7341_channels_spectral_data_t spectralData;
+        ret = as7341ReadData(&spectralData);
+        if (ret == ESP_OK) {
+            sensorServicePublishSpectralData(&spectralData);
+        } else {
+            ESP_LOGE(TAG, "AS7341读取失败");
+        }
+        as7341Deinit();
+    } else {
+        ESP_LOGE(TAG, "AS7341初始化失败");
+    }
+
+    scd41_data_t envData;
+    ret = scd41ReadData(&envData);
+    if (ret == ESP_OK && envData.data_valid) {
+        sensorServicePublishEnvironmentData(&envData);
+    } else {
+        ESP_LOGW(TAG, "SCD41数据读取失败");
+    }
+
+    ESP_LOGI(TAG, "传感器立即上报完成");
+}
