@@ -51,6 +51,14 @@ esp_err_t scd41Init(void)
         return ret;
     }
 
+    ret = scd4x_stop_periodic_measurement(&g_scd41_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "停止周期测量失败(可能未在运行): %s", esp_err_to_name(ret));
+    } else {
+        ESP_LOGI(TAG, "已停止周期测量模式");
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
+
     uint16_t serial0, serial1, serial2;
     ret = scd4x_get_serial_number(&g_scd41_dev, &serial0, &serial1, &serial2);
     if (ret == ESP_OK) {
@@ -58,6 +66,12 @@ esp_err_t scd41Init(void)
     } else {
         ESP_LOGW(TAG, "读取序列号失败: %s", esp_err_to_name(ret));
     }
+
+    ret = scd4x_persist_settings(&g_scd41_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "保存SCD41配置失败: %s", esp_err_to_name(ret));
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     g_initialized = true;
     ESP_LOGI(TAG, "SCD41初始化成功，使用单次测量模式");
@@ -76,6 +90,7 @@ esp_err_t scd41ReadData(scd41_data_t *data)
     }
 
     ESP_LOGI(TAG, "启动SCD41单次测量...");
+
     esp_err_t ret = scd4x_measure_single_shot(&g_scd41_dev);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "启动单次测量失败: %s", esp_err_to_name(ret));
@@ -86,21 +101,23 @@ esp_err_t scd41ReadData(scd41_data_t *data)
     ESP_LOGI(TAG, "等待测量完成...");
     vTaskDelay(pdMS_TO_TICKS(5000));
 
-    uint16_t co2_ticks, temp_ticks, hum_ticks;
-    ret = scd4x_read_measurement_ticks(&g_scd41_dev, &co2_ticks, &temp_ticks, &hum_ticks);
+    uint16_t co2;
+    float temperature, humidity;
+    ret = scd4x_read_measurement(&g_scd41_dev, &co2, &temperature, &humidity);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "读取测量数据失败: %s", esp_err_to_name(ret));
         data->data_valid = false;
         return ret;
     }
 
-    data->co2_ppm = co2_ticks;
-    data->temperature_c = -45.0f + 175.0f * ((float)temp_ticks) / 65536.0f;
-    data->humidity_rh = 100.0f * ((float)hum_ticks) / 65536.0f;
+    data->co2_ppm = co2;
+    data->temperature_c = temperature;
+    data->humidity_rh = humidity;
     data->data_valid = true;
 
     ESP_LOGI(TAG, "SCD41数据: CO2=%uppm, 温度=%.2fC, 湿度=%.2f%%RH",
              data->co2_ppm, data->temperature_c, data->humidity_rh);
+
     return ESP_OK;
 }
 
