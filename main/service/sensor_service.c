@@ -8,6 +8,7 @@
 #include "network/mqtt_wrapper.h"
 #include "driver/driver_as7341.h"
 #include "driver/driver_scd41.h"
+#include "driver/ei_classifier.h"
 #include "sensor_service.h"
 
 static const char *TAG = "SENSOR_SVC";
@@ -82,6 +83,8 @@ static void sensorTask(void *param)
         return;
     }
 
+    eiClassifierInit();
+
     ESP_LOGI(TAG, "发布传感器发现配置...");
     sensorServicePublishDiscovery();
 
@@ -103,6 +106,14 @@ static void sensorTask(void *param)
         ret = as7341ReadData(&spectralData);
         if (ret == ESP_OK) {
             sensorServicePublishSpectralData(&spectralData);
+
+            ei_inference_result_t inferResult;
+            esp_err_t eiRet = eiClassifierRun(&spectralData, &inferResult);
+            if (eiRet == ESP_OK) {
+                sensorServicePublishInferenceData(&inferResult);
+            } else {
+                ESP_LOGE(TAG, "EI推理失败");
+            }
         } else {
             ESP_LOGE(TAG, "AS7341读取失败");
         }
@@ -171,6 +182,11 @@ esp_err_t sensorServicePublishDiscovery(void)
     publishDiscovery("co2", "CO2 Concentration", "carbon_dioxide", "ppm");
     publishDiscovery("temperature", "Temperature", "temperature", "\xC2\xB0""C");
     publishDiscovery("humidity", "Humidity", "humidity", "%");
+    publishDiscovery(SENSOR_ID_PLANT_STATUS, "Plant Status", NULL, NULL);
+    publishDiscovery(SENSOR_ID_PLANT_CONFIDENCE, "Plant Confidence", NULL, "%");
+    publishDiscovery(SENSOR_ID_PLANT_DISEASED, "Plant Diseased", NULL, "%");
+    publishDiscovery(SENSOR_ID_PLANT_HEALTHY, "Plant Healthy", NULL, "%");
+    publishDiscovery(SENSOR_ID_PLANT_LOW_WATER, "Plant Low Water", NULL, "%");
 
     ESP_LOGI(TAG, "所有传感器发现配置已发布");
     return ESP_OK;
@@ -225,12 +241,30 @@ esp_err_t sensorServicePublishEnvironmentData(const scd41_data_t *data)
     return ESP_OK;
 }
 
+esp_err_t sensorServicePublishInferenceData(const ei_inference_result_t *result)
+{
+    if (result == NULL) return ESP_ERR_INVALID_ARG;
+
+    char statusTopic[64];
+    snprintf(statusTopic, sizeof(statusTopic), "%s/sensor/%s", MQTT_SENSOR_BASE, SENSOR_ID_PLANT_STATUS);
+    mqttClientPublish(statusTopic, result->bestLabel, 1, 1);
+
+    publishFloatValue(SENSOR_ID_PLANT_CONFIDENCE, result->bestValue * 100.0f, "%.1f");
+    publishFloatValue(SENSOR_ID_PLANT_DISEASED, result->results[0].value * 100.0f, "%.1f");
+    publishFloatValue(SENSOR_ID_PLANT_HEALTHY, result->results[1].value * 100.0f, "%.1f");
+    publishFloatValue(SENSOR_ID_PLANT_LOW_WATER, result->results[2].value * 100.0f, "%.1f");
+
+    return ESP_OK;
+}
+
 void sensorServiceReportOnce(void)
 {
     if (!mqttClientIsConnected()) {
         ESP_LOGW(TAG, "MQTT未连接，无法立即上报");
         return;
     }
+
+    eiClassifierInit();
 
     ESP_LOGI(TAG, "立即采集传感器数据并上报");
 
@@ -240,6 +274,14 @@ void sensorServiceReportOnce(void)
         ret = as7341ReadData(&spectralData);
         if (ret == ESP_OK) {
             sensorServicePublishSpectralData(&spectralData);
+
+            ei_inference_result_t inferResult;
+            esp_err_t eiRet = eiClassifierRun(&spectralData, &inferResult);
+            if (eiRet == ESP_OK) {
+                sensorServicePublishInferenceData(&inferResult);
+            } else {
+                ESP_LOGE(TAG, "EI推理失败");
+            }
         } else {
             ESP_LOGE(TAG, "AS7341读取失败");
         }

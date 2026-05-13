@@ -51,6 +51,12 @@
 #define MQTT_CONNECT_TIMEOUT   30000
 #define MQTT_SENSOR_INTERVAL   600000
 
+#define SENSOR_ID_PLANT_STATUS     "plant_status"
+#define SENSOR_ID_PLANT_CONFIDENCE "plant_confidence"
+#define SENSOR_ID_PLANT_DISEASED   "plant_diseased"
+#define SENSOR_ID_PLANT_HEALTHY    "plant_healthy"
+#define SENSOR_ID_PLANT_LOW_WATER  "plant_low_water"
+
 #define HTTP_OUTPUT_BUFFER     8192
 #define SERVERCHAN_URL_PREFIX  "http://sctapi.ftqq.com/"
 
