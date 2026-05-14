@@ -10,6 +10,7 @@
 #include "driver/driver_scd41.h"
 #include "driver/ei_classifier.h"
 #include "sensor_service.h"
+#include "display_service.h"
 
 static const char *TAG = "SENSOR_SVC";
 
@@ -111,6 +112,7 @@ static void sensorTask(void *param)
             esp_err_t eiRet = eiClassifierRun(&spectralData, &inferResult);
             if (eiRet == ESP_OK) {
                 sensorServicePublishInferenceData(&inferResult);
+                displayServiceUpdate(&inferResult);
             } else {
                 ESP_LOGE(TAG, "EI推理失败");
             }
@@ -279,6 +281,7 @@ void sensorServiceReportOnce(void)
             esp_err_t eiRet = eiClassifierRun(&spectralData, &inferResult);
             if (eiRet == ESP_OK) {
                 sensorServicePublishInferenceData(&inferResult);
+                displayServiceUpdate(&inferResult);
             } else {
                 ESP_LOGE(TAG, "EI推理失败");
             }

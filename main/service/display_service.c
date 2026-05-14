@@ -1,0 +1,129 @@
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "app_config.h"
+#include "driver/driver_ssd1306.h"
+#include "service/display_service.h"
+#include "storage/storage.h"
+
+static const char *TAG = "DISPLAY_SVC";
+static bool g_initialized = false;
+
+static void convertToUppercase(char *str)
+{
+    if (str == NULL) return;
+    
+    for (int i = 0; str[i] != '\0'; i++) {
+        if (str[i] >= 'a' && str[i] <= 'z') {
+            str[i] = str[i] - ('a' - 'A');
+        }
+    }
+}
+
+esp_err_t displayServiceInit(void)
+{
+    if (g_initialized) {
+        ESP_LOGW(TAG, "显示服务已初始化");
+        return ESP_OK;
+    }
+
+    ssd1306_config_t config = {
+        .width = OLED_WIDTH,
+        .height = OLED_HEIGHT,
+        .sclPin = OLED_I2C_SOFT_SCL,
+        .sdaPin = OLED_I2C_SOFT_SDA,
+        .address = OLED_I2C_ADDRESS,
+        .columnOffset = OLED_COLUMN_OFFSET,
+        .pageOffset = OLED_PAGE_OFFSET
+    };
+
+    esp_err_t ret = ssd1306Init(&config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "SSD1306初始化失败");
+        return ret;
+    }
+
+    g_initialized = true;
+    ESP_LOGI(TAG, "显示服务初始化成功");
+    return ESP_OK;
+}
+
+void displayServiceShowInitScreen(void)
+{
+    if (!g_initialized) {
+        ESP_LOGW(TAG, "显示服务未初始化");
+        return;
+    }
+
+    ESP_LOGI(TAG, "显示初始化画面");
+
+    ssd1306Clear();
+
+    ssd1306SetCursor(46, 47);
+    ssd1306Print("LEAVES");
+
+    ssd1306SetCursor(43, 39);
+    ssd1306Print("MONITOR");
+
+    ssd1306Display();
+
+    vTaskDelay(pdMS_TO_TICKS(3000));
+
+    ESP_LOGI(TAG, "初始化画面已显示，等待ML结果覆盖");
+}
+
+void displayServiceUpdate(const ei_inference_result_t *result)
+{
+    if (!g_initialized) {
+        return;
+    }
+
+    if (result == NULL) {
+        ESP_LOGW(TAG, "输入参数为空");
+        return;
+    }
+
+    char label1[32], label2[32], label3[32];
+    
+    snprintf(label1, sizeof(label1), "%s", result->results[0].label);
+    snprintf(label2, sizeof(label2), "%s", result->results[1].label);
+    snprintf(label3, sizeof(label3), "%s", result->results[2].label);
+    
+    convertToUppercase(label1);
+    convertToUppercase(label2);
+    convertToUppercase(label3);
+
+    ssd1306Clear();
+
+    ssd1306SetCursor(1, 0);
+    ssd1306Print(label1);
+    ssd1306Print("     ");
+    ssd1306PrintFloat(result->results[0].value * 100.0f, 1);
+    ssd1306Print("%");
+
+    ssd1306SetCursor(1, 10);
+    ssd1306Print(label2);
+    ssd1306Print("     ");
+    ssd1306PrintFloat(result->results[1].value * 100.0f, 1);
+    ssd1306Print("%");
+
+    ssd1306SetCursor(1, 20);
+    ssd1306Print(label3);
+    ssd1306Print("     ");
+    ssd1306PrintFloat(result->results[2].value * 100.0f, 1);
+    ssd1306Print("%");
+
+    ssd1306Display();
+
+    ESP_LOGI(TAG, "OLED显示已更新");
+}
+
+void displayServiceDeinit(void)
+{
+    if (!g_initialized) return;
+
+    ssd1306Deinit();
+    g_initialized = false;
+
+    ESP_LOGI(TAG, "显示服务已释放");
+}

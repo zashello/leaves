@@ -60,6 +60,15 @@
 #define HTTP_OUTPUT_BUFFER     8192
 #define SERVERCHAN_URL_PREFIX  "http://sctapi.ftqq.com/"
 
+#define OLED_I2C_SOFT_SCL          13
+#define OLED_I2C_SOFT_SDA          14
+#define OLED_I2C_ADDRESS           0x3C
+#define OLED_I2C_DELAY_US          5
+#define OLED_WIDTH                 128
+#define OLED_HEIGHT                64
+#define OLED_PAGE_OFFSET           0
+#define OLED_COLUMN_OFFSET         0
+
 typedef struct {
     char wifiSsid[WIFI_SSID_MAX_LEN];
     char wifiPass[WIFI_PASS_MAX_LEN];

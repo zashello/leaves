@@ -1,0 +1,17 @@
+#pragma once
+
+#include <esp_err.h>
+#include "driver/ei_classifier.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+esp_err_t displayServiceInit(void);
+void displayServiceShowInitScreen(void);
+void displayServiceUpdate(const ei_inference_result_t *result);
+void displayServiceDeinit(void);
+
+#ifdef __cplusplus
+}
+#endif

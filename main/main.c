@@ -11,6 +11,7 @@
 #include "driver/driver_button.h"
 #include "tasks/task_provision.h"
 #include "tasks/task_network.h"
+#include "service/display_service.h"
 
 static const char *TAG = "APP";
 
@@ -80,6 +81,14 @@ void app_main(void)
     }
 
     taskManagerInit();
+
+    ret = displayServiceInit();
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "OLED显示服务初始化成功");
+        displayServiceShowInitScreen();
+    } else {
+        ESP_LOGW(TAG, "OLED显示服务初始化失败，继续运行");
+    }
 
     if (storageIsValid()) {
         ESP_LOGI(TAG, "检测到已保存配置，启动网络连接任务");
