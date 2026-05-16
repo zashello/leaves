@@ -61,7 +61,7 @@ void menuDisplayShowScd41Data(const scd41_data_t *data)
 {
     if (data == NULL) return;
 
-    char buf[32];
+    char buf[64];
 
     ssd1306Clear();
 
@@ -69,15 +69,15 @@ void menuDisplayShowScd41Data(const scd41_data_t *data)
     ssd1306Print("SCD41 DATA");
 
     ssd1306SetCursor(0, 12);
-    snprintf(buf, sizeof(buf), "CO2: %u PPM", data->co2_ppm);
+    snprintf(buf, sizeof(buf), "CO2 LEVEL : %u PPM", data->co2_ppm);
     ssd1306Print(buf);
 
     ssd1306SetCursor(0, 22);
-    snprintf(buf, sizeof(buf), "TMP: %.1f C", data->temperature_c);
+    snprintf(buf, sizeof(buf), "TEMPERATURE: %.1f C", data->temperature_c);
     ssd1306Print(buf);
 
     ssd1306SetCursor(0, 32);
-    snprintf(buf, sizeof(buf), "HUM: %.1f RH", data->humidity_rh);
+    snprintf(buf, sizeof(buf), "HUMIDITY   : %.1f RH", data->humidity_rh);
     ssd1306Print(buf);
 
     ssd1306SetCursor(0, 50);
@@ -90,7 +90,7 @@ void menuDisplayShowPlantAnalysis(const ei_inference_result_t *result)
 {
     if (result == NULL) return;
 
-    char buf[32];
+    char buf[64];
 
     ssd1306Clear();
 
@@ -98,20 +98,35 @@ void menuDisplayShowPlantAnalysis(const ei_inference_result_t *result)
     ssd1306Print("PLANT ANALYSIS");
 
     ssd1306SetCursor(0, 11);
-    snprintf(buf, sizeof(buf), "DIS: %.1f%%", result->results[0].value * 100.0f);
+    snprintf(buf, sizeof(buf), "DISEASED   : %.1f%%", result->results[0].value * 100.0f);
     ssd1306Print(buf);
 
     ssd1306SetCursor(0, 21);
-    snprintf(buf, sizeof(buf), "HLT: %.1f%%", result->results[1].value * 100.0f);
+    snprintf(buf, sizeof(buf), "HEALTHY    : %.1f%%", result->results[1].value * 100.0f);
     ssd1306Print(buf);
 
     ssd1306SetCursor(0, 31);
-    snprintf(buf, sizeof(buf), "H2O: %.1f%%", result->results[2].value * 100.0f);
+    snprintf(buf, sizeof(buf), "LOW WATER  : %.1f%%", result->results[2].value * 100.0f);
     ssd1306Print(buf);
 
     if (result->bestLabel != NULL) {
         ssd1306SetCursor(0, 43);
-        snprintf(buf, sizeof(buf), "BEST: %s", result->bestLabel);
+        
+        char upperLabel[32] = {0};
+        int len = 0;
+        for (int i = 0; i < 31 && result->bestLabel[i] != '\0'; i++) {
+            if (result->bestLabel[i] >= 'a' && result->bestLabel[i] <= 'z') {
+                upperLabel[i] = result->bestLabel[i] - 32;
+            } else if (result->bestLabel[i] == '_') {
+                upperLabel[i] = ' ';
+            } else {
+                upperLabel[i] = result->bestLabel[i];
+            }
+            len = i + 1;
+        }
+        upperLabel[len] = '\0';
+        
+        snprintf(buf, sizeof(buf), "BEST: %.26s", upperLabel);
         ssd1306Print(buf);
     }
 
@@ -209,7 +224,7 @@ void menuDisplayShowLogEntry(const log_entry_t *entry, int index, int total)
 {
     if (entry == NULL) return;
 
-    char buf[32];
+    char buf[64];
 
     ssd1306Clear();
 

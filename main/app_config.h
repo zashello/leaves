@@ -12,7 +12,7 @@
 #define MQTT_PASS_MAX_LEN      64
 #define DEVICE_NAME_MAX_LEN    32
 
-#define PROVISION_SSID         "Leaves_Setup"
+#define PROVISION_SSID         "LEAVES"
 #define PROVISION_PASS         "12345678"
 
 #define AS7341_I2C_SCL         5
