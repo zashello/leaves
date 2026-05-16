@@ -73,7 +73,16 @@ static void publishUintValue(const char *sensorId, unsigned int value)
 
 static void sensorTask(void *param)
 {
-    const TickType_t interval = pdMS_TO_TICKS(MQTT_SENSOR_INTERVAL);
+    device_config_t config;
+    memset(&config, 0, sizeof(config));
+    storageLoad(&config);
+
+    uint32_t intervalMs = config.mqttReportInterval * 60 * 1000;
+    if (intervalMs == 0) {
+        intervalMs = MQTT_SENSOR_INTERVAL;
+    }
+
+    const TickType_t interval = pdMS_TO_TICKS(intervalMs);
     const TickType_t initialDelay = pdMS_TO_TICKS(5000);
 
     ESP_LOGI(TAG, "等待5秒后开始传感器任务...");

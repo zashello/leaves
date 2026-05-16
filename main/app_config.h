@@ -94,4 +94,5 @@ typedef struct {
     bool enableMqtt;
     bool enableAiService;
     bool enableAutoNetwork;
+    uint16_t mqttReportInterval;
 } device_config_t;

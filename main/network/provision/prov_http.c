@@ -66,6 +66,7 @@ static esp_err_t configGetHandler(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "enableMqtt", config.enableMqtt);
     cJSON_AddBoolToObject(root, "enableAi", config.enableAiService);
     cJSON_AddBoolToObject(root, "enableAutoNet", config.enableAutoNetwork);
+    cJSON_AddNumberToObject(root, "mqttReportInterval", config.mqttReportInterval);
 
     char *jsonStr = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -141,6 +142,17 @@ static esp_err_t saveHandler(httpd_req_t *req)
     item = cJSON_GetObjectItem(root, "enableAutoNet");
     config.enableAutoNetwork = (item && cJSON_IsBool(item)) ? item->valueint : false;
 
+    item = cJSON_GetObjectItem(root, "mqttReportInterval");
+    if (item && cJSON_IsNumber(item)) {
+        uint16_t interval = (uint16_t)item->valueint;
+        if (interval < 1 || interval > 1440) {
+            interval = 10;
+        }
+        config.mqttReportInterval = interval;
+    } else {
+        config.mqttReportInterval = 10;
+    }
+
     cJSON_Delete(root);
 
     if (strlen(config.wifiSsid) == 0) {
@@ -158,6 +170,12 @@ static esp_err_t saveHandler(httpd_req_t *req)
     if (config.enableAiService && strlen(config.siliconflowKey) == 0) {
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"AI API KEY REQUIRED\"}");
+        return ESP_FAIL;
+    }
+
+    if ((config.enableMqtt || config.enableAiService) && (config.mqttReportInterval < 1 || config.mqttReportInterval > 1440)) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"REPORT INTERVAL MUST BE 1-1440 MINUTES\"}");
         return ESP_FAIL;
     }
 

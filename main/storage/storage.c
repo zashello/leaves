@@ -21,6 +21,7 @@ static const char *KEY_VALID = "cfg_valid";
 static const char *KEY_ENABLE_MQTT = "enable_mqtt";
 static const char *KEY_ENABLE_AI = "enable_ai";
 static const char *KEY_ENABLE_AUTO_NET = "enable_auto_net";
+static const char *KEY_MQTT_REPORT_INTERVAL = "mqtt_interval";
 
 esp_err_t storageInit(void)
 {
@@ -101,6 +102,14 @@ esp_err_t storageLoad(device_config_t *config)
     nvs_get_u8(handle, KEY_ENABLE_AUTO_NET, &enableAutoNet);
     config->enableAutoNetwork = (enableAutoNet == 1);
 
+    uint16_t reportInterval = 0;
+    nvs_get_u16(handle, KEY_MQTT_REPORT_INTERVAL, &reportInterval);
+    if (reportInterval == 0) {
+        config->mqttReportInterval = 10;
+    } else {
+        config->mqttReportInterval = reportInterval;
+    }
+
     config->configValid = true;
     nvs_close(handle);
 
@@ -153,6 +162,9 @@ esp_err_t storageSave(const device_config_t *config)
     if (ret != ESP_OK) goto save_err;
 
     ret = nvs_set_u8(handle, KEY_ENABLE_AUTO_NET, config->enableAutoNetwork ? 1 : 0);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_u16(handle, KEY_MQTT_REPORT_INTERVAL, config->mqttReportInterval);
     if (ret != ESP_OK) goto save_err;
 
     ret = nvs_set_u8(handle, KEY_VALID, 1);
