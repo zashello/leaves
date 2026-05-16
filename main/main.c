@@ -12,7 +12,11 @@
 #include "driver/driver_scd41.h"
 #include "system/system_log.h"
 #include "system/menu_system.h"
+#include "system/menu_display.h"
 #include "service/display_service.h"
+#include "network/wifi_sta.h"
+#include "network/mqtt_wrapper.h"
+#include "service/sensor_service.h"
 
 static const char *TAG = "APP";
 
@@ -84,6 +88,45 @@ void app_main(void)
 
     menuSystemInit();
     systemLogAdd(LOG_LEVEL_INFO, "MENU SYSTEM READY");
+
+    // 自动联网逻辑
+    device_config_t autoConfig;
+    memset(&autoConfig, 0, sizeof(autoConfig));
+    
+    if (storageLoad(&autoConfig) == ESP_OK && autoConfig.configValid) {
+        if (autoConfig.enableAutoNetwork) {
+            ESP_LOGI(TAG, "AUTO CONNECT WIFI");
+            systemLogAdd(LOG_LEVEL_INFO, "AUTO CONNECT WIFI");
+            
+            menuDisplayShowWaiting("AUTO CONNECT...");
+            
+            esp_err_t wifiResult = wifiStaConnect(&autoConfig);
+            if (wifiResult == ESP_OK) {
+                bool connected = wifiStaWaitConnected(30000);
+                if (connected) {
+                    systemLogAdd(LOG_LEVEL_INFO, "WIFI CONNECTED");
+                    menuDisplayShowSuccess("WIFI OK");
+                    
+                    if (autoConfig.enableMqtt) {
+                        mqttClientInit();
+                        mqttClientConnect();
+                        sensorServiceStart();
+                        systemLogAdd(LOG_LEVEL_INFO, "MQTT STARTED");
+                    }
+                    
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                } else {
+                    systemLogAdd(LOG_LEVEL_ERROR, "WIFI CONNECT TIMEOUT");
+                    menuDisplayShowError("WIFI TIMEOUT");
+                    vTaskDelay(pdMS_TO_TICKS(1500));
+                }
+            } else {
+                systemLogAdd(LOG_LEVEL_ERROR, "WIFI INIT FAIL");
+                menuDisplayShowError("WIFI INIT FAIL");
+                vTaskDelay(pdMS_TO_TICKS(1500));
+            }
+        }
+    }
 
     appStateSet(APP_STATE_RUNNING);
     ESP_LOGI(TAG, "ENTER MENU LOOP");
