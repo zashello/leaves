@@ -3,9 +3,11 @@
 #include "nvs.h"
 #include "esp_log.h"
 #include "storage.h"
+#include "system/system_log.h"
 
 static const char *TAG = "STORAGE";
 static const char *NVS_NAMESPACE = "leaf_cfg";
+static const char *NVS_LOG_NAMESPACE = "leaf_log";
 static const char *KEY_WIFI_SSID = "wifi_ssid";
 static const char *KEY_WIFI_PASS = "wifi_pass";
 static const char *KEY_SF_KEY = "sf_key";
@@ -16,6 +18,9 @@ static const char *KEY_MQTT_USER = "mqtt_user";
 static const char *KEY_MQTT_PASS = "mqtt_pass";
 static const char *KEY_DEVICE_NAME = "device_name";
 static const char *KEY_VALID = "cfg_valid";
+static const char *KEY_ENABLE_MQTT = "enable_mqtt";
+static const char *KEY_ENABLE_AI = "enable_ai";
+static const char *KEY_ENABLE_AUTO_NET = "enable_auto_net";
 
 esp_err_t storageInit(void)
 {
@@ -84,6 +89,18 @@ esp_err_t storageLoad(device_config_t *config)
     len = sizeof(config->deviceName);
     nvs_get_str(handle, KEY_DEVICE_NAME, config->deviceName, &len);
 
+    uint8_t enableMqtt = 0;
+    nvs_get_u8(handle, KEY_ENABLE_MQTT, &enableMqtt);
+    config->enableMqtt = (enableMqtt == 1);
+
+    uint8_t enableAi = 0;
+    nvs_get_u8(handle, KEY_ENABLE_AI, &enableAi);
+    config->enableAiService = (enableAi == 1);
+
+    uint8_t enableAutoNet = 0;
+    nvs_get_u8(handle, KEY_ENABLE_AUTO_NET, &enableAutoNet);
+    config->enableAutoNetwork = (enableAutoNet == 1);
+
     config->configValid = true;
     nvs_close(handle);
 
@@ -129,6 +146,15 @@ esp_err_t storageSave(const device_config_t *config)
     ret = nvs_set_str(handle, KEY_DEVICE_NAME, config->deviceName);
     if (ret != ESP_OK) goto save_err;
 
+    ret = nvs_set_u8(handle, KEY_ENABLE_MQTT, config->enableMqtt ? 1 : 0);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_u8(handle, KEY_ENABLE_AI, config->enableAiService ? 1 : 0);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_u8(handle, KEY_ENABLE_AUTO_NET, config->enableAutoNetwork ? 1 : 0);
+    if (ret != ESP_OK) goto save_err;
+
     ret = nvs_set_u8(handle, KEY_VALID, 1);
     if (ret != ESP_OK) goto save_err;
 
@@ -170,4 +196,67 @@ bool storageIsValid(void)
     nvs_close(handle);
 
     return valid == 1;
+}
+
+static const char *logKey(int index)
+{
+    static char key[16];
+    snprintf(key, sizeof(key), "log_%d", index);
+    return key;
+}
+
+esp_err_t storageSaveLogEntry(int index, const log_entry_t *entry)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_LOG_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK) return ret;
+
+    if (index == -1) {
+        int slot = -1;
+        for (int i = 0; i < LOG_MAX_ENTRIES; i++) {
+            log_entry_t temp;
+            size_t len = sizeof(log_entry_t);
+            if (nvs_get_blob(handle, logKey(i), &temp, &len) != ESP_OK || temp.timestamp == 0) {
+                slot = i;
+                break;
+            }
+        }
+        if (slot == -1) {
+            for (int i = 0; i < LOG_MAX_ENTRIES - 1; i++) {
+                log_entry_t temp;
+                size_t len = sizeof(log_entry_t);
+                if (nvs_get_blob(handle, logKey(i + 1), &temp, &len) == ESP_OK) {
+                    nvs_set_blob(handle, logKey(i), &temp, len);
+                }
+            }
+            slot = LOG_MAX_ENTRIES - 1;
+        }
+        index = slot;
+    }
+
+    if (index < 0 || index >= LOG_MAX_ENTRIES) {
+        nvs_close(handle);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ret = nvs_set_blob(handle, logKey(index), entry, sizeof(log_entry_t));
+    nvs_commit(handle);
+    nvs_close(handle);
+    return ret;
+}
+
+esp_err_t storageLoadLogEntry(int index, log_entry_t *entry)
+{
+    if (index < 0 || index >= LOG_MAX_ENTRIES || entry == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(NVS_LOG_NAMESPACE, NVS_READONLY, &handle);
+    if (ret != ESP_OK) return ret;
+
+    size_t len = sizeof(log_entry_t);
+    ret = nvs_get_blob(handle, logKey(index), entry, &len);
+    nvs_close(handle);
+    return ret;
 }

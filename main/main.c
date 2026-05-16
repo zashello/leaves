@@ -9,111 +9,88 @@
 #include "core/event_bus.h"
 #include "storage/storage.h"
 #include "driver/driver_button.h"
-#include "tasks/task_provision.h"
-#include "tasks/task_network.h"
+#include "driver/driver_scd41.h"
+#include "system/system_log.h"
+#include "system/menu_system.h"
 #include "service/display_service.h"
 
 static const char *TAG = "APP";
 
-static void buttonEventHandler(button_event_t event)
+static void menuButtonHandler(button_event_t event)
 {
     if (event == BUTTON_EVENT_LONG_PRESS) {
-        ESP_LOGW(TAG, "长按3秒触发，清除配网参数并重启...");
+        ESP_LOGW(TAG, "LONG PRESS: CLEAR CONFIG AND REBOOT");
         storageClear();
+        systemLogAdd(LOG_LEVEL_CRITICAL, "LONG PRESS RESET");
         vTaskDelay(pdMS_TO_TICKS(1000));
         esp_restart();
+        return;
     }
+    menuSystemHandleEvent(event);
 }
 
 static void onStateChange(app_state_t from, app_state_t to)
 {
-    ESP_LOGI(TAG, "系统状态变更: %s -> %s", appStateGetName(from), appStateGetName(to));
-}
-
-static void onEvent(app_event_t event, void *data)
-{
-    switch (event) {
-        case EVENT_WIFI_CONNECTED:
-            ESP_LOGI(TAG, "[事件] WiFi已连接");
-            break;
-        case EVENT_WIFI_DISCONNECTED:
-            ESP_LOGW(TAG, "[事件] WiFi已断开");
-            break;
-        case EVENT_MQTT_CONNECTED:
-            ESP_LOGI(TAG, "[事件] MQTT已连接");
-            break;
-        case EVENT_MQTT_DISCONNECTED:
-            ESP_LOGW(TAG, "[事件] MQTT已断开");
-            break;
-        case EVENT_BUTTON_LONG_PRESS:
-            ESP_LOGW(TAG, "[事件] 按键长按");
-            break;
-        default:
-            break;
-    }
+    ESP_LOGI(TAG, "STATE: %s -> %s", appStateGetName(from), appStateGetName(to));
 }
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Leaves 植物分析系统启动");
+    ESP_LOGI(TAG, "LEAVES PLANT MONITOR START");
 
     appStateInit();
     appStateRegisterCallback(onStateChange);
+    appStateSet(APP_STATE_INIT);
 
     eventBusInit();
-    eventBusSubscribe(EVENT_WIFI_CONNECTED, onEvent);
-    eventBusSubscribe(EVENT_WIFI_DISCONNECTED, onEvent);
-    eventBusSubscribe(EVENT_MQTT_CONNECTED, onEvent);
-    eventBusSubscribe(EVENT_MQTT_DISCONNECTED, onEvent);
 
     esp_err_t ret = storageInit();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "存储系统初始化失败");
+        ESP_LOGE(TAG, "STORAGE INIT FAIL");
         appStateSet(APP_STATE_ERROR);
         return;
     }
 
-    ret = buttonInit();
-    if (ret == ESP_OK) {
-        buttonRegisterCallback(buttonEventHandler);
-    } else {
-        ESP_LOGW(TAG, "按键初始化失败，重置功能不可用");
-    }
+    systemLogInit();
+    systemLogAdd(LOG_LEVEL_INFO, "SYSTEM BOOT");
 
-    taskManagerInit();
+    ret = scd41Init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "SCD41 INIT FAIL");
+        systemLogAdd(LOG_LEVEL_WARNING, "SCD41 INIT FAIL");
+    } else {
+        systemLogAdd(LOG_LEVEL_INFO, "SCD41 INIT OK");
+    }
 
     ret = displayServiceInit();
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "OLED显示服务初始化成功");
         displayServiceShowInitScreen();
+        systemLogAdd(LOG_LEVEL_INFO, "OLED INIT OK");
     } else {
-        ESP_LOGW(TAG, "OLED显示服务初始化失败，继续运行");
+        ESP_LOGW(TAG, "OLED INIT FAIL");
+        systemLogAdd(LOG_LEVEL_WARNING, "OLED INIT FAIL");
     }
 
-    if (storageIsValid()) {
-        ESP_LOGI(TAG, "检测到已保存配置，启动网络连接任务");
-        task_config_t networkTask = {
-            .name = "network",
-            .function = taskNetwork,
-            .stackSize = 8192,
-            .priority = 5,
-            .param = NULL
-        };
-        taskManagerCreate(&networkTask);
+    if (buttonInitMulti() == ESP_OK) {
+        buttonRegisterCallback(menuButtonHandler);
+        systemLogAdd(LOG_LEVEL_INFO, "BUTTON INIT OK");
     } else {
-        ESP_LOGI(TAG, "未检测到有效配置，启动配网任务");
-        task_config_t provTask = {
-            .name = "provision",
-            .function = taskProvision,
-            .stackSize = 8192,
-            .priority = 5,
-            .param = NULL
-        };
-        taskManagerCreate(&provTask);
+        ESP_LOGW(TAG, "BUTTON INIT FAIL");
+        systemLogAdd(LOG_LEVEL_WARNING, "BUTTON INIT FAIL");
     }
+
+    eiClassifierInit();
+    systemLogAdd(LOG_LEVEL_INFO, "EI CLASSIFIER INIT OK");
+
+    menuSystemInit();
+    systemLogAdd(LOG_LEVEL_INFO, "MENU SYSTEM READY");
+
+    appStateSet(APP_STATE_RUNNING);
+    ESP_LOGI(TAG, "ENTER MENU LOOP");
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(30000));
-        taskManagerPrintStatus();
+        menuSystemShow();
+        menuSystemCheckTimeout();
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }

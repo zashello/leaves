@@ -63,6 +63,9 @@ static esp_err_t configGetHandler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "mqttUser", config.mqttUsername);
     cJSON_AddStringToObject(root, "mqttPass", config.mqttPassword);
     cJSON_AddStringToObject(root, "deviceName", config.deviceName);
+    cJSON_AddBoolToObject(root, "enableMqtt", config.enableMqtt);
+    cJSON_AddBoolToObject(root, "enableAi", config.enableAiService);
+    cJSON_AddBoolToObject(root, "enableAutoNet", config.enableAutoNetwork);
 
     char *jsonStr = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -129,11 +132,32 @@ static esp_err_t saveHandler(httpd_req_t *req)
         strncpy(config.deviceName, "leaves_device", sizeof(config.deviceName) - 1);
     }
 
+    item = cJSON_GetObjectItem(root, "enableMqtt");
+    config.enableMqtt = (item && cJSON_IsBool(item)) ? item->valueint : false;
+
+    item = cJSON_GetObjectItem(root, "enableAi");
+    config.enableAiService = (item && cJSON_IsBool(item)) ? item->valueint : false;
+
+    item = cJSON_GetObjectItem(root, "enableAutoNet");
+    config.enableAutoNetwork = (item && cJSON_IsBool(item)) ? item->valueint : false;
+
     cJSON_Delete(root);
 
-    if (strlen(config.wifiSsid) == 0 || strlen(config.siliconflowKey) == 0 || strlen(config.serverchanKey) == 0) {
+    if (strlen(config.wifiSsid) == 0) {
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"必填字段不能为空\"}");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"WIFI SSID REQUIRED\"}");
+        return ESP_FAIL;
+    }
+
+    if (config.enableMqtt && strlen(config.mqttServer) == 0) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"MQTT SERVER REQUIRED\"}");
+        return ESP_FAIL;
+    }
+
+    if (config.enableAiService && strlen(config.siliconflowKey) == 0) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"AI API KEY REQUIRED\"}");
         return ESP_FAIL;
     }
 

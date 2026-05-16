@@ -57,10 +57,15 @@ idf_component_register(
         "service/ha_integration.c"
         "service/notify.c"
         "service/display_service.c"
+        "system/menu_system.c"
+        "system/menu_display.c"
+        "system/menu_actions.c"
+        "system/system_log.c"
         "tasks/task_provision.c"
         "tasks/task_network.c"
         "tasks/task_sensor.c"
         "tasks/task_ai.c"
+        "tasks/task_auto_network.c"
         ${EI_FILTERED_SRCS}
         ${EI_MODEL_SRCS}
     INCLUDE_DIRS
@@ -71,6 +76,7 @@ idf_component_register(
         "./network"
         "./network/provision"
         "./service"
+        "./system"
         "./tasks"
         "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v3-impulse-#4"
         "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v3-impulse-#4/edge-impulse-sdk"

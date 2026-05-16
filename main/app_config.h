@@ -24,7 +24,10 @@
 #define SCD41_I2C_PORT         1
 #define SCD41_I2C_FREQ         100000
 
-#define BUTTON_GPIO            10
+#define BUTTON_UP_GPIO         9
+#define BUTTON_DOWN_GPIO       10
+#define BUTTON_CONFIRM_GPIO    11
+#define BUTTON_BACK_GPIO       12
 #define BUTTON_DEBOUNCE_MS     50
 #define BUTTON_LONG_PRESS_MS   3000
 
@@ -69,6 +72,14 @@
 #define OLED_PAGE_OFFSET           0
 #define OLED_COLUMN_OFFSET         0
 
+#define MENU_MAX_DEPTH         3
+#define MENU_TIMEOUT_MS        60000
+#define MENU_LINE_HEIGHT       10
+#define MENU_ITEMS_PER_SCREEN  5
+
+#define LOG_MAX_ENTRIES        10
+#define LOG_ENTRY_SIZE         128
+
 typedef struct {
     char wifiSsid[WIFI_SSID_MAX_LEN];
     char wifiPass[WIFI_PASS_MAX_LEN];
@@ -80,4 +91,7 @@ typedef struct {
     char mqttPassword[MQTT_PASS_MAX_LEN];
     char deviceName[DEVICE_NAME_MAX_LEN];
     bool configValid;
+    bool enableMqtt;
+    bool enableAiService;
+    bool enableAutoNetwork;
 } device_config_t;

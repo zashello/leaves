@@ -48,10 +48,28 @@ esp_err_t wifiStaConnect(const device_config_t *config)
 
     esp_netif_init();
     esp_event_loop_create_default();
-    esp_netif_create_default_wifi_sta();
+
+    // 检查 STA 接口是否存在，避免重复创建
+    esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (sta_netif == NULL) {
+        esp_netif_create_default_wifi_sta();
+        ESP_LOGI(TAG, "STA 接口已创建");
+    } else {
+        ESP_LOGI(TAG, "STA 接口已存在，跳过创建");
+    }
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_err_t init_ret = esp_wifi_init(&cfg);
+    if (init_ret == ESP_OK) {
+        ESP_LOGI(TAG, "WiFi 初始化成功");
+    } else if (init_ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGI(TAG, "WiFi 已初始化，继续执行");
+    } else {
+        ESP_LOGE(TAG, "WiFi 初始化失败: %s", esp_err_to_name(init_ret));
+        vEventGroupDelete(s_wifi_event_group);
+        s_wifi_event_group = NULL;
+        return ESP_FAIL;
+    }
 
     esp_event_handler_instance_t instanceAnyId;
     esp_event_handler_instance_t instanceGotIp;

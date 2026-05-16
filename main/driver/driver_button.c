@@ -2,6 +2,7 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/Queue.h>
 #include <freertos/timers.h>
 #include "driver_button.h"
 #include "app_config.h"
@@ -9,80 +10,128 @@
 static const char *TAG = "BUTTON";
 
 static button_callback_t gCallback = NULL;
-static TimerHandle_t gDebounceTimer = NULL;
+static QueueHandle_t gEventQueue = NULL;
 static TimerHandle_t gLongPressTimer = NULL;
-static volatile bool gButtonPressed = false;
+static volatile bool gDownPressed = false;
+
+static struct {
+    int gpio;
+    button_event_t event;
+    volatile TickType_t lastInterrupt;
+} g_buttons[4] = {
+    {BUTTON_UP_GPIO,      BUTTON_EVENT_UP,      0},
+    {BUTTON_DOWN_GPIO,    BUTTON_EVENT_DOWN,     0},
+    {BUTTON_CONFIRM_GPIO, BUTTON_EVENT_CONFIRM,  0},
+    {BUTTON_BACK_GPIO,    BUTTON_EVENT_BACK,     0},
+};
 
 static void longPressCallback(TimerHandle_t xTimer)
 {
-    if (gpio_get_level(BUTTON_GPIO) == 0) {
-        ESP_LOGW(TAG, "长按3秒触发");
+    if (gpio_get_level(BUTTON_DOWN_GPIO) == 0 && gDownPressed) {
+        ESP_LOGW(TAG, "LONG PRESS TRIGGERED");
         if (gCallback) {
             gCallback(BUTTON_EVENT_LONG_PRESS);
         }
     }
 }
 
-static void debounceCallback(TimerHandle_t xTimer)
+static void sendEvent(button_event_t event)
 {
-    int level = gpio_get_level(BUTTON_GPIO);
-    if (level == 0 && !gButtonPressed) {
-        gButtonPressed = true;
-        ESP_LOGI(TAG, "按键按下，开始长按计时...");
-        xTimerStart(gLongPressTimer, 0);
-    } else if (level != 0 && gButtonPressed) {
-        gButtonPressed = false;
-        ESP_LOGI(TAG, "按键松开，取消长按");
-        xTimerStop(gLongPressTimer, 0);
+    if (gEventQueue != NULL) {
+        xQueueSend(gEventQueue, &event, 0);
     }
 }
 
 static void IRAM_ATTR buttonIsrHandler(void *arg)
 {
-    BaseType_t highTaskWakeup = pdFALSE;
-    xTimerStartFromISR(gDebounceTimer, &highTaskWakeup);
-    if (highTaskWakeup == pdTRUE) {
-        portYIELD_FROM_ISR();
+    int idx = (int)arg;
+    if (idx < 0 || idx >= 4) return;
+
+    TickType_t now = xTaskGetTickCountFromISR();
+    if (now - g_buttons[idx].lastInterrupt < pdMS_TO_TICKS(BUTTON_DEBOUNCE_MS)) {
+        return;
+    }
+    g_buttons[idx].lastInterrupt = now;
+
+    int level = gpio_get_level(g_buttons[idx].gpio);
+    if (level == 0) {
+        if (idx == 1) {
+            gDownPressed = true;
+            BaseType_t higherTaskWoken = pdFALSE;
+            xTimerStartFromISR(gLongPressTimer, &higherTaskWoken);
+            if (higherTaskWoken == pdTRUE) portYIELD_FROM_ISR();
+        }
+        sendEvent(g_buttons[idx].event);
+    } else {
+        if (idx == 1 && gDownPressed) {
+            gDownPressed = false;
+            BaseType_t higherTaskWoken = pdFALSE;
+            xTimerStopFromISR(gLongPressTimer, &higherTaskWoken);
+            if (higherTaskWoken == pdTRUE) portYIELD_FROM_ISR();
+        }
     }
 }
 
-esp_err_t buttonInit(void)
+static void buttonTask(void *param)
 {
-    gpio_config_t ioConf = {
-        .pin_bit_mask = (1ULL << BUTTON_GPIO),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_ANYEDGE,
-    };
-    esp_err_t ret = gpio_config(&ioConf);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "GPIO配置失败: %s", esp_err_to_name(ret));
-        return ret;
+    button_event_t event;
+    while (1) {
+        if (xQueueReceive(gEventQueue, &event, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (gCallback) {
+                gCallback(event);
+            }
+        }
     }
+}
 
-    gDebounceTimer = xTimerCreate("btn_dbnc", pdMS_TO_TICKS(BUTTON_DEBOUNCE_MS),
-                                  pdFALSE, NULL, debounceCallback);
-    gLongPressTimer = xTimerCreate("btn_long", pdMS_TO_TICKS(BUTTON_LONG_PRESS_MS),
-                                   pdFALSE, NULL, longPressCallback);
-    if (!gDebounceTimer || !gLongPressTimer) {
-        ESP_LOGE(TAG, "定时器创建失败");
+esp_err_t buttonInitMulti(void)
+{
+    gEventQueue = xQueueCreate(16, sizeof(button_event_t));
+    if (gEventQueue == NULL) {
+        ESP_LOGE(TAG, "EVENT QUEUE CREATE FAILED");
         return ESP_FAIL;
     }
 
-    ret = gpio_install_isr_service(0);
+    gLongPressTimer = xTimerCreate("btn_long", pdMS_TO_TICKS(BUTTON_LONG_PRESS_MS),
+                                    pdFALSE, NULL, longPressCallback);
+    if (gLongPressTimer == NULL) {
+        ESP_LOGE(TAG, "LONG PRESS TIMER CREATE FAILED");
+        return ESP_FAIL;
+    }
+
+    esp_err_t ret = gpio_install_isr_service(0);
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_LOGE(TAG, "ISR服务安装失败: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "ISR SERVICE INSTALL FAILED: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    ret = gpio_isr_handler_add(BUTTON_GPIO, buttonIsrHandler, NULL);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "ISR注册失败: %s", esp_err_to_name(ret));
-        return ret;
+    for (int i = 0; i < 4; i++) {
+        gpio_config_t ioConf = {
+            .pin_bit_mask = (1ULL << g_buttons[i].gpio),
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_ANYEDGE,
+        };
+        ret = gpio_config(&ioConf);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "GPIO%d CONFIG FAILED: %s", g_buttons[i].gpio, esp_err_to_name(ret));
+            continue;
+        }
+
+        ret = gpio_isr_handler_add(g_buttons[i].gpio, buttonIsrHandler, (void *)(intptr_t)i);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "GPIO%d ISR ADD FAILED: %s", g_buttons[i].gpio, esp_err_to_name(ret));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "BUTTON GPIO%d INIT OK (%s)", g_buttons[i].gpio,
+                 i == 0 ? "UP" : i == 1 ? "DOWN" : i == 2 ? "CONFIRM" : "BACK");
     }
 
-    ESP_LOGI(TAG, "按键初始化成功 (GPIO%d, 长按%ds触发重置)", BUTTON_GPIO, BUTTON_LONG_PRESS_MS / 1000);
+    xTaskCreate(buttonTask, "btn_task", 8192, NULL, 5, NULL);
+
+    ESP_LOGI(TAG, "BUTTON SYSTEM INIT OK");
     return ESP_OK;
 }
 
