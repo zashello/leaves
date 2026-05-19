@@ -8,6 +8,39 @@ static const char *TAG = "EI_CLASSIFY";
 static float g_features[EI_CLASSIFIER_RAW_SAMPLES_PER_FRAME];
 static bool g_initialized = false;
 
+static void calculateVegetationIndices(
+    const as7341_channels_spectral_data_t *spectralData, 
+    float *ndvi, float *gndvi, float *psri)
+{
+    if (spectralData == NULL) {
+        *ndvi = 0.0f;
+        *gndvi = 0.0f;
+        *psri = 0.0f;
+        return;
+    }
+
+    if ((spectralData->f8 + spectralData->f5) != 0) {
+        *ndvi = (float)(spectralData->f8 - spectralData->f5) / 
+                (float)(spectralData->f8 + spectralData->f5);
+    } else {
+        *ndvi = 0.0f;
+    }
+
+    if ((spectralData->nir + spectralData->f7) != 0) {
+        *gndvi = (float)(spectralData->nir - spectralData->f7) / 
+                 (float)(spectralData->nir + spectralData->f7);
+    } else {
+        *gndvi = 0.0f;
+    }
+
+    if (spectralData->f8 != 0) {
+        *psri = (float)(spectralData->f7 - spectralData->f5) / 
+                (float)spectralData->f8;
+    } else {
+        *psri = 0.0f;
+    }
+}
+
 static int featureCallback(size_t offset, size_t length, float *out_ptr)
 {
     if (offset + length > EI_CLASSIFIER_RAW_SAMPLES_PER_FRAME) {
@@ -27,7 +60,7 @@ esp_err_t eiClassifierInit(void)
     run_classifier_init();
     g_initialized = true;
 
-    ESP_LOGI(TAG, "EI分类器初始化完成 (标签: Diseased/Healthy/Low_Water)");
+    ESP_LOGI(TAG, "EI分类器初始化完成 (标签: Diseased/Healthy/Low_Nutrient/Low_Water)");
     return ESP_OK;
 }
 
@@ -52,6 +85,12 @@ esp_err_t eiClassifierRun(const as7341_channels_spectral_data_t *spectralData, e
     g_features[7] = (float)spectralData->f8;
     g_features[8] = (float)spectralData->nir;
     g_features[9] = (float)spectralData->clear;
+
+    float ndvi, gndvi, psri;
+    calculateVegetationIndices(spectralData, &ndvi, &gndvi, &psri);
+    g_features[10] = ndvi;
+    g_features[11] = gndvi;
+    g_features[12] = psri;
 
     ei::signal_t signal;
     signal.total_length = EI_CLASSIFIER_RAW_SAMPLES_PER_FRAME;

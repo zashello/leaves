@@ -197,6 +197,7 @@ esp_err_t sensorServicePublishDiscovery(void)
     publishDiscovery(SENSOR_ID_PLANT_CONFIDENCE, "Plant Confidence", NULL, "%");
     publishDiscovery(SENSOR_ID_PLANT_DISEASED, "Plant Diseased", NULL, "%");
     publishDiscovery(SENSOR_ID_PLANT_HEALTHY, "Plant Healthy", NULL, "%");
+    publishDiscovery(SENSOR_ID_PLANT_LOW_NUTRIENT, "Plant Low Nutrient", NULL, "%");
     publishDiscovery(SENSOR_ID_PLANT_LOW_WATER, "Plant Low Water", NULL, "%");
 
     ESP_LOGI(TAG, "所有传感器发现配置已发布");
@@ -263,7 +264,8 @@ esp_err_t sensorServicePublishInferenceData(const ei_inference_result_t *result)
     publishFloatValue(SENSOR_ID_PLANT_CONFIDENCE, result->bestValue * 100.0f, "%.1f");
     publishFloatValue(SENSOR_ID_PLANT_DISEASED, result->results[0].value * 100.0f, "%.1f");
     publishFloatValue(SENSOR_ID_PLANT_HEALTHY, result->results[1].value * 100.0f, "%.1f");
-    publishFloatValue(SENSOR_ID_PLANT_LOW_WATER, result->results[2].value * 100.0f, "%.1f");
+    publishFloatValue(SENSOR_ID_PLANT_LOW_NUTRIENT, result->results[2].value * 100.0f, "%.1f");
+    publishFloatValue(SENSOR_ID_PLANT_LOW_WATER, result->results[3].value * 100.0f, "%.1f");
 
     return ESP_OK;
 }

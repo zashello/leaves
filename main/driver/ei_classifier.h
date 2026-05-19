@@ -3,7 +3,7 @@
 #include <esp_err.h>
 #include <as7341.h>
 
-#define EI_CLASS_COUNT 3
+#define EI_CLASS_COUNT 4
 
 #ifdef __cplusplus
 extern "C" {

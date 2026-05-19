@@ -97,21 +97,25 @@ void menuDisplayShowPlantAnalysis(const ei_inference_result_t *result)
     ssd1306SetCursor(0, 0);
     ssd1306Print("PLANT ANALYSIS");
 
-    ssd1306SetCursor(0, 11);
-    snprintf(buf, sizeof(buf), "DISEASED   : %.1f%%", result->results[0].value * 100.0f);
+    ssd1306SetCursor(0, 10);
+    snprintf(buf, sizeof(buf), "DISEASED : %.1f%%", result->results[0].value * 100.0f);
     ssd1306Print(buf);
 
-    ssd1306SetCursor(0, 21);
-    snprintf(buf, sizeof(buf), "HEALTHY    : %.1f%%", result->results[1].value * 100.0f);
+    ssd1306SetCursor(0, 19);
+    snprintf(buf, sizeof(buf), "HEALTHY  : %.1f%%", result->results[1].value * 100.0f);
     ssd1306Print(buf);
 
-    ssd1306SetCursor(0, 31);
-    snprintf(buf, sizeof(buf), "LOW WATER  : %.1f%%", result->results[2].value * 100.0f);
+    ssd1306SetCursor(0, 28);
+    snprintf(buf, sizeof(buf), "LOW NUTR: %.1f%%", result->results[2].value * 100.0f);
+    ssd1306Print(buf);
+
+    ssd1306SetCursor(0, 37);
+    snprintf(buf, sizeof(buf), "LOW WATER: %.1f%%", result->results[3].value * 100.0f);
     ssd1306Print(buf);
 
     if (result->bestLabel != NULL) {
-        ssd1306SetCursor(0, 43);
-        
+        ssd1306SetCursor(0, 48);
+
         char upperLabel[32] = {0};
         int len = 0;
         for (int i = 0; i < 31 && result->bestLabel[i] != '\0'; i++) {
@@ -125,12 +129,12 @@ void menuDisplayShowPlantAnalysis(const ei_inference_result_t *result)
             len = i + 1;
         }
         upperLabel[len] = '\0';
-        
-        snprintf(buf, sizeof(buf), "BEST: %.26s", upperLabel);
+
+        snprintf(buf, sizeof(buf), "BEST: %.20s", upperLabel);
         ssd1306Print(buf);
     }
 
-    ssd1306SetCursor(0, 54);
+    ssd1306SetCursor(0, 58);
     ssd1306Print("PRESS BACK");
 
     ssd1306Display();

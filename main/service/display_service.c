@@ -9,13 +9,15 @@
 static const char *TAG = "DISPLAY_SVC";
 static bool g_initialized = false;
 
-static void convertToUppercase(char *str)
+static void convertToUppercaseAndSpaces(char *str)
 {
     if (str == NULL) return;
-    
+
     for (int i = 0; str[i] != '\0'; i++) {
         if (str[i] >= 'a' && str[i] <= 'z') {
             str[i] = str[i] - ('a' - 'A');
+        } else if (str[i] == '_') {
+            str[i] = ' ';
         }
     }
 }
@@ -83,34 +85,42 @@ void displayServiceUpdate(const ei_inference_result_t *result)
         return;
     }
 
-    char label1[32], label2[32], label3[32];
-    
+    char label1[32], label2[32], label3[32], label4[32];
+
     snprintf(label1, sizeof(label1), "%s", result->results[0].label);
     snprintf(label2, sizeof(label2), "%s", result->results[1].label);
     snprintf(label3, sizeof(label3), "%s", result->results[2].label);
-    
-    convertToUppercase(label1);
-    convertToUppercase(label2);
-    convertToUppercase(label3);
+    snprintf(label4, sizeof(label4), "%s", result->results[3].label);
+
+    convertToUppercaseAndSpaces(label1);
+    convertToUppercaseAndSpaces(label2);
+    convertToUppercaseAndSpaces(label3);
+    convertToUppercaseAndSpaces(label4);
 
     ssd1306Clear();
 
     ssd1306SetCursor(1, 0);
     ssd1306Print(label1);
-    ssd1306Print("     ");
+    ssd1306Print("  ");
     ssd1306PrintFloat(result->results[0].value * 100.0f, 1);
     ssd1306Print("%");
 
     ssd1306SetCursor(1, 10);
     ssd1306Print(label2);
-    ssd1306Print("     ");
+    ssd1306Print("  ");
     ssd1306PrintFloat(result->results[1].value * 100.0f, 1);
     ssd1306Print("%");
 
     ssd1306SetCursor(1, 20);
     ssd1306Print(label3);
-    ssd1306Print("     ");
+    ssd1306Print("  ");
     ssd1306PrintFloat(result->results[2].value * 100.0f, 1);
+    ssd1306Print("%");
+
+    ssd1306SetCursor(1, 30);
+    ssd1306Print(label4);
+    ssd1306Print("  ");
+    ssd1306PrintFloat(result->results[3].value * 100.0f, 1);
     ssd1306Print("%");
 
     ssd1306Display();
