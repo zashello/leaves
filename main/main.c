@@ -18,8 +18,27 @@
 #include "network/wifi_sta.h"
 #include "network/mqtt_wrapper.h"
 #include "service/sensor_service.h"
+#include "service/ha_integration.h"
+#include "service/ai_service.h"
 
 static const char *TAG = "APP";
+
+static void printMqttIntegrationStatus(void)
+{
+    ESP_LOGI(TAG, "========== MQTT集成状态诊断 ==========");
+    ESP_LOGI(TAG, "MQTT连接状态: %s", mqttClientIsConnected() ? "已连接" : "未连接");
+    ESP_LOGI(TAG, "MQTT连接状态: %d", (int)mqttClientGetState());
+    ESP_LOGI(TAG, "HomeAssistant集成: 已启动");
+    ESP_LOGI(TAG, "AI分析回调: 已设置 (aiServiceRun)");
+    ESP_LOGI(TAG, "传感器上报回调: 已设置 (sensorServiceReportOnce)");
+    ESP_LOGI(TAG, "支持的主题:");
+    ESP_LOGI(TAG, "  - %s (AI触发)", MQTT_TRIGGER_TOPIC);
+    ESP_LOGI(TAG, "  - %s (设备命令)", MQTT_COMMAND_TOPIC);
+    ESP_LOGI(TAG, "支持的指令:");
+    ESP_LOGI(TAG, "  - ai_analysis");
+    ESP_LOGI(TAG, "  - sensor_report");
+    ESP_LOGI(TAG, "===========================================");
+}
 
 static void menuButtonHandler(button_event_t event)
 {
@@ -128,12 +147,83 @@ void app_main(void)
                 if (connected) {
                     systemLogAdd(LOG_LEVEL_INFO, "WIFI CONNECTED");
                     menuDisplayShowSuccess("WIFI OK");
-                    
+
                     if (autoConfig.enableMqtt) {
-                        mqttClientInit();
-                        mqttClientConnect();
-                        sensorServiceStart();
-                        systemLogAdd(LOG_LEVEL_INFO, "MQTT STARTED");
+                        ESP_LOGI(TAG, "初始化MQTT和传感器服务...");
+                        
+                        // MQTT初始化
+                        esp_err_t mqttInitRet = mqttClientInit();
+                        if (mqttInitRet != ESP_OK) {
+                            ESP_LOGE(TAG, "MQTT初始化失败: %s", esp_err_to_name(mqttInitRet));
+                            systemLogAdd(LOG_LEVEL_ERROR, "MQTT INIT FAIL");
+                        } else {
+                            ESP_LOGI(TAG, "MQTT初始化成功");
+                            systemLogAdd(LOG_LEVEL_INFO, "MQTT INIT OK");
+                        }
+
+                        // MQTT连接
+                        esp_err_t mqttConnRet = mqttClientConnect();
+                        if (mqttConnRet != ESP_OK) {
+                            ESP_LOGE(TAG, "MQTT连接失败: %s", esp_err_to_name(mqttConnRet));
+                            systemLogAdd(LOG_LEVEL_ERROR, "MQTT CONNECT FAIL");
+                        } else {
+                            ESP_LOGI(TAG, "MQTT连接指令已发送");
+                            
+                            // 等待MQTT连接建立（最多10秒）
+                            int connectRetry = 0;
+                            bool mqttConnected = false;
+                            while (connectRetry < 10 && !mqttConnected) {
+                                mqttConnected = mqttClientIsConnected();
+                                if (mqttConnected) {
+                                    break;
+                                }
+                                vTaskDelay(pdMS_TO_TICKS(1000));
+                                connectRetry++;
+                                ESP_LOGI(TAG, "等待MQTT连接... (%d/10)", connectRetry);
+                            }
+                            
+                            if (mqttConnected) {
+                                ESP_LOGI(TAG, "MQTT连接确认成功");
+                                systemLogAdd(LOG_LEVEL_INFO, "MQTT CONNECTED OK");
+
+                                // 启动HomeAssistant集成（关键修复）
+                                ESP_LOGI(TAG, "启动HomeAssistant集成...");
+                                haIntegrationStart();
+                                systemLogAdd(LOG_LEVEL_INFO, "HA INTEGRATION STARTED");
+                                
+                                //设置AI分析回调（关键修复）
+                                ESP_LOGI(TAG, "设置AI分析回调...");
+                                haIntegrationSetAiCallback(aiServiceRun);
+                                ESP_LOGI(TAG, "设置传感器上报回调...");
+                                haIntegrationSetSensorCallback(sensorServiceReportOnce);
+                                systemLogAdd(LOG_LEVEL_INFO, "MQTT CALLBACKS SET");
+                                
+                                ESP_LOGI(TAG, "✓ MQTT指令处理功能已启用");
+                                systemLogAdd(LOG_LEVEL_INFO, "MQTT COMMAND HANDLER READY");
+                                printMqttIntegrationStatus();  // 调用诊断函数
+                            } else {
+                                ESP_LOGW(TAG, "MQTT连接超时（10秒），后台将继续重连");
+                                systemLogAdd(LOG_LEVEL_WARNING, "MQTT CONNECT TIMEOUT, WILL RETRY");
+                                // 即使MQTT连接超时，也启用HA集成以便后续重连后能接收消息
+                                haIntegrationStart();
+                                haIntegrationSetAiCallback(aiServiceRun);
+                                haIntegrationSetSensorCallback(sensorServiceReportOnce);
+                                printMqttIntegrationStatus();  // 调用诊断函数
+                                printMqttIntegrationStatus();  // 调用诊断函数
+                            }
+                        }
+
+                        // 传感器服务启动（独立于MQTT连接状态）
+                        esp_err_t sensorRet = sensorServiceStart();
+                        if (sensorRet != ESP_OK) {
+                            ESP_LOGE(TAG, "传感器服务启动失败: %s", esp_err_to_name(sensorRet));
+                            systemLogAdd(LOG_LEVEL_ERROR, "SENSOR SERVICE START FAIL");
+                        } else {
+                            ESP_LOGI(TAG, "传感器服务启动成功");
+                            systemLogAdd(LOG_LEVEL_INFO, "SENSOR SERVICE STARTED");
+                        }
+                        
+                        systemLogAdd(LOG_LEVEL_INFO, "AUTO NETWORK SETUP COMPLETE");
                     }
                     
                     vTaskDelay(pdMS_TO_TICKS(1000));
