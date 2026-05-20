@@ -12,6 +12,4 @@ esp_err_t as7341LedControl(bool enable);
 esp_err_t as7341SetLedCurrent(as7341_led_drive_strengths_t current);
 esp_err_t as7341SetLedCurrentMA(int current_mA);
 esp_err_t as7341GetLedStatus(bool *enabled, as7341_led_drive_strengths_t *current);
-esp_err_t as7341VerifyHardware(void);
-void as7341TestLedCurrent(void);
 bool as7341IsInitialized(void);

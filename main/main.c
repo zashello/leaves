@@ -97,16 +97,6 @@ void app_main(void)
         systemLogAdd(LOG_LEVEL_INFO, "AS7341 INIT OK");
     }
 
-    // AS7341硬件检测 - 验证LED控制功能
-    ESP_LOGI(TAG, "开始AS7341硬件检测...");
-    as7341VerifyHardware();
-    systemLogAdd(LOG_LEVEL_INFO, "AS7341 HARDWARE CHECK DONE");
-
-    // LED电流测试 - 可选的详细测试功能
-    // ESP_LOGI(TAG, "开始LED驱动电流测试...");
-    // as7341TestLedCurrent();
-    // systemLogAdd(LOG_LEVEL_INFO, "LED CURRENT TEST DONE");
-
     ret = displayServiceInit();
     if (ret == ESP_OK) {
         displayServiceShowInitScreen();
