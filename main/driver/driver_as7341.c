@@ -17,9 +17,17 @@ static as7341_handle_t g_as7341 = NULL;
 
 esp_err_t as7341Init(void)
 {
+    // 幂等性保护：检查是否已经初始化
     if (g_as7341 != NULL) {
-        ESP_LOGW(TAG, "传感器已初始化");
+        ESP_LOGW(TAG, "传感器已初始化，跳过重复初始化");
         return ESP_OK;
+    }
+
+    // 幂等性保护：检查I2C总线状态
+    if (g_i2c_bus != NULL) {
+        ESP_LOGW(TAG, "I2C总线已存在，进行完整清理后重新初始化");
+        // 清理可能存在的残留状态
+        g_i2c_bus = NULL;
     }
 
     ESP_LOGI(TAG, "初始化AS7341: SCL=GPIO%d, SDA=GPIO%d, 频率=%dHz",
@@ -32,9 +40,12 @@ esp_err_t as7341Init(void)
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
     };
+
+    // 尝试创建I2C总线
     esp_err_t ret = i2c_new_master_bus(&bus_config, &g_i2c_bus);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "I2C总线创建失败: %s (0x%x)", esp_err_to_name(ret), ret);
+        g_i2c_bus = NULL;  // 确保状态一致
         return ret;
     }
 
@@ -45,14 +56,18 @@ esp_err_t as7341Init(void)
         .atime = 29,
         .astep = 599,
     };
+
+    // 初始化AS7341设备
     ret = as7341_init(g_i2c_bus, &as7341_config, &g_as7341);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "AS7341初始化失败: %s", esp_err_to_name(ret));
         i2c_del_master_bus(g_i2c_bus);
         g_i2c_bus = NULL;
+        g_as7341 = NULL;  // 确保状态一致
         return ret;
     }
 
+    // 启用传感器电源
     ret = as7341_enable_power(g_as7341);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "AS7341上电失败: %s", esp_err_to_name(ret));
@@ -63,6 +78,35 @@ esp_err_t as7341Init(void)
         return ret;
     }
 
+    // 配置LED控制 - 这是最关键的一步
+    // 配置CONFIG寄存器的LED控制使能位（关键配置）
+    as7341_config_register_t config;
+    ret = as7341_get_config_register(g_as7341, &config);
+    if (ret == ESP_OK) {
+        config.bits.led_ldr_control_enabled = true;  // 使能CONFIG寄存器的LED控制
+        ret = as7341_set_config_register(g_as7341, config);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "CONFIG寄存器LED控制位设置失败: %s", esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "CONFIG寄存器LED控制位已使能");
+        }
+    } else {
+        ESP_LOGE(TAG, "读取CONFIG寄存器失败: %s", esp_err_to_name(ret));
+    }
+
+    // 配置LED寄存器的驱动电流和使能状态（低电平激活模式）
+    as7341_led_register_t led_reg = {
+        .bits.led_drive_strength = AS7341_LED_DRIVE_STRENGTH_12MA,
+        .bits.led_ldr_enabled = false  // 低电平启动LED（LED阳极接VCC，阴极接LDR）
+    };
+    ret = as7341_set_led_register(g_as7341, led_reg);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "LED初始化失败: %s", esp_err_to_name(ret));
+    } else {
+        ESP_LOGI(TAG, "LED控制已启用(低电平激活模式)，驱动电流12mA(开始)，稳定时间%u ms", AS7341_LED_ON_TIME_MS);
+    }
+
+    // 启用光谱测量
     ret = as7341_enable_spectral_measurement(g_as7341);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "启用光谱测量失败: %s", esp_err_to_name(ret));
@@ -84,6 +128,39 @@ esp_err_t as7341ReadData(as7341_channels_spectral_data_t *data)
         return ESP_FAIL;
     }
 
+    esp_err_t ret = as7341LedControl(true);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "LED开启失败，继续测量: %s", esp_err_to_name(ret));
+    }
+
+    // 验证LED是否真的开启了，并输出详细状态信息
+    bool led_enabled;
+    as7341_led_drive_strengths_t led_current;
+    esp_err_t check_ret = as7341GetLedStatus(&led_enabled, &led_current);
+    if (check_ret == ESP_OK) {
+        ESP_LOGI(TAG, "LED状态验证: %s, 驱动电流: %dmA",
+                 led_enabled ? "开启" : "关闭",
+                 4 + (int)led_current * 2);
+        if (!led_enabled) {
+            ESP_LOGW(TAG, "⚠️  LED未实际开启，测量可能不准确");
+        }
+    } else {
+        ESP_LOGW(TAG, "LED状态验证失败: %s", esp_err_to_name(check_ret));
+    }
+
+    // 输出关键寄存器状态用于调试
+    as7341_config_register_t config_check;
+    as7341_led_register_t led_check;
+    if (as7341_get_config_register(g_as7341, &config_check) == ESP_OK) {
+        ESP_LOGI(TAG, "CONFIG寄存器: 0x%02X, LED控制位: %d",
+                 config_check.reg, config_check.bits.led_ldr_control_enabled);
+    }
+    if (as7341_get_led_register(g_as7341, &led_check) == ESP_OK) {
+        ESP_LOGI(TAG, "LED寄存器: 0x%02X, LED启用位(低电平激活): %d(%s)",
+                 led_check.reg, led_check.bits.led_ldr_enabled,
+                 led_check.bits.led_ldr_enabled ? "关闭" : "开启");
+    }
+
     as7341_astatus_register_t astatus;
     as7341_status2_register_t status2;
     esp_err_t sret = as7341_get_astatus_register(g_as7341, &astatus);
@@ -102,7 +179,7 @@ esp_err_t as7341ReadData(as7341_channels_spectral_data_t *data)
     int retry = 0;
     const int max_retry = 20;
     while (!ready && retry < max_retry) {
-        esp_err_t ret = as7341_get_data_status(g_as7341, &ready);
+        ret = as7341_get_data_status(g_as7341, &ready);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "数据状态查询失败: %s", esp_err_to_name(ret));
             return ret;
@@ -117,16 +194,19 @@ esp_err_t as7341ReadData(as7341_channels_spectral_data_t *data)
         return ESP_ERR_TIMEOUT;
     }
 
-    esp_err_t ret = as7341_get_spectral_measurements(g_as7341, data);
+    ret = as7341_get_spectral_measurements(g_as7341, data);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "光谱数据读取失败: %s", esp_err_to_name(ret));
+        as7341LedControl(false);
         return ret;
     }
 
     ESP_LOGI(TAG, "光谱数据: F1=%u F2=%u F3=%u F4=%u F5=%u F6=%u F7=%u F8=%u Clear=%u NIR=%u",
-             data->f1, data->f2, data->f3, data->f4,
-             data->f5, data->f6, data->f7, data->f8,
-             data->clear, data->nir);
+              data->f1, data->f2, data->f3, data->f4,
+              data->f5, data->f6, data->f7, data->f8,
+              data->clear, data->nir);
+
+    as7341LedControl(false);
     return ESP_OK;
 }
 
@@ -183,15 +263,318 @@ char* as7341DataToJson(const as7341_channels_spectral_data_t *data)
     return json_str;
 }
 
+esp_err_t as7341LedControl(bool enable)
+{
+    if (g_as7341 == NULL) {
+        ESP_LOGE(TAG, "传感器未初始化");
+        return ESP_FAIL;
+    }
+
+    esp_err_t ret;
+    if (enable) {
+        ret = as7341_enable_led(g_as7341);
+        if (ret == ESP_OK) {
+            vTaskDelay(pdMS_TO_TICKS(AS7341_LED_ON_TIME_MS));
+            ESP_LOGI(TAG, "LED补光灯已开启(低电平激活)，稳定%u ms", AS7341_LED_ON_TIME_MS);
+        } else {
+            ESP_LOGE(TAG, "LED开启失败: %s", esp_err_to_name(ret));
+        }
+    } else {
+        ret = as7341_disable_led(g_as7341);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "LED关闭失败: %s", esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "LED补光灯已关闭(低电平激活)");
+        }
+    }
+
+    return ret;
+}
+
+esp_err_t as7341SetLedCurrent(as7341_led_drive_strengths_t current)
+{
+    if (g_as7341 == NULL) {
+        ESP_LOGE(TAG, "传感器未初始化");
+        return ESP_FAIL;
+    }
+
+    as7341_config_register_t config_reg;
+    esp_err_t ret = as7341_get_config_register(g_as7341, &config_reg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "读取CONFIG寄存器失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    config_reg.bits.led_ldr_control_enabled = true;
+    ret = as7341_set_config_register(g_as7341, config_reg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "设置CONFIG寄存器失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    as7341_led_register_t led_reg;
+    ret = as7341_get_led_register(g_as7341, &led_reg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "读取LED寄存器失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    led_reg.bits.led_drive_strength = current;
+    led_reg.bits.led_ldr_enabled = false;  // 低电平激活模式
+    ret = as7341_set_led_register(g_as7341, led_reg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "设置LED驱动电流失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "LED驱动电流已设置为%d mA(低电平激活模式)", 4 + (int)current * 2);
+    return ESP_OK;
+}
+
+esp_err_t as7341GetLedStatus(bool *enabled, as7341_led_drive_strengths_t *current)
+{
+    if (g_as7341 == NULL) {
+        ESP_LOGE(TAG, "传感器未初始化");
+        return ESP_FAIL;
+    }
+
+    if (enabled == NULL || current == NULL) {
+        ESP_LOGE(TAG, "参数不能为NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    as7341_led_register_t led_reg;
+    esp_err_t ret = as7341_get_led_register(g_as7341, &led_reg);
+    if (ret == ESP_OK) {
+        *enabled = !led_reg.bits.led_ldr_enabled;  // 反转逻辑：false=开启, true=关闭
+        *current = led_reg.bits.led_drive_strength;
+        ESP_LOGI(TAG, "LED状态(低电平激活): %s, 驱动电流: %dmA, LDR电平: %s",
+                 *enabled ? "开启" : "关闭",
+                 4 + (int)(*current) * 2,
+                 led_reg.bits.led_ldr_enabled ? "HIGH(关闭)" : "LOW(开启)");
+    } else {
+        ESP_LOGE(TAG, "读取LED寄存器失败: %s", esp_err_to_name(ret));
+    }
+
+    return ret;
+}
+
+esp_err_t as7341VerifyHardware(void)
+{
+    // 安全检查：确保传感器已初始化
+    if (g_as7341 == NULL) {
+        ESP_LOGE(TAG, "传感器未初始化，无法进行硬件验证");
+        return ESP_FAIL;
+    }
+
+    if (g_i2c_bus == NULL) {
+        ESP_LOGE(TAG, "I2C总线未初始化，无法进行硬件验证");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "========== AS7341硬件验证开始 ==========");
+
+    // 验证芯片ID
+    as7341_part_id_register_t part_id;
+    esp_err_t ret = as7341_get_part_id_register(g_as7341, &part_id);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "芯片ID: 0x%02X (预期: 0x09)", part_id.reg);
+        if (part_id.bits.identifier != 9) {
+            ESP_LOGW(TAG, "芯片ID不匹配，可能是不同版本或假冒产品");
+        } else {
+            ESP_LOGI(TAG, "✓ 芯片ID验证通过");
+        }
+    } else {
+        ESP_LOGE(TAG, "读取芯片ID失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // 验证版本ID
+    as7341_revision_id_register_t rev_id;
+    ret = as7341_get_revision_id_register(g_as7341, &rev_id);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "版本ID: 0x%02X", rev_id.reg);
+    }
+
+    // 检查CONFIG寄存器的LED控制位配置
+    as7341_config_register_t config;
+    ret = as7341_get_config_register(g_as7341, &config);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "CONFIG寄存器: 0x%02X", config.reg);
+        ESP_LOGI(TAG, "LED控制位状态: %s", config.bits.led_ldr_control_enabled ? "✓已使能" : "✗未使能");
+        if (!config.bits.led_ldr_control_enabled) {
+            ESP_LOGW(TAG, "警告：CONFIG寄存器LED控制位未使能，LED可能无法正常工作");
+        }
+    } else {
+        ESP_LOGE(TAG, "读取CONFIG寄存器失败: %s", esp_err_to_name(ret));
+    }
+
+    // 检查LED寄存器的详细配置
+    as7341_led_register_t led_reg;
+    ret = as7341_get_led_register(g_as7341, &led_reg);
+    if (ret == ESP_OK) {
+        int current_ma = 4 + (int)led_reg.bits.led_drive_strength * 2;
+        ESP_LOGI(TAG, "LED寄存器: 0x%02X", led_reg.reg);
+        ESP_LOGI(TAG, "LED硬件使能位(低电平激活): %s (LDR状态: %s)",
+                 led_reg.bits.led_ldr_enabled ? "关闭状态" : "开启状态",
+                 led_reg.bits.led_ldr_enabled ? "HIGH" : "LOW");
+        ESP_LOGI(TAG, "LED驱动电流: %dmA (寄存器值: %d)", current_ma, led_reg.bits.led_drive_strength);
+    } else {
+        ESP_LOGE(TAG, "读取LED寄存器失败: %s", esp_err_to_name(ret));
+    }
+
+    ESP_LOGI(TAG, "测试LED控制功能(低电平激活模式)...");
+    ESP_LOGI(TAG, "请观察AS7341模块上的LED是否点亮");
+    ESP_LOGI(TAG, "LED测试时间: %u ms", AS7341_LED_TEST_TIME_MS);
+
+    ret = as7341_enable_led(g_as7341);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "✓ LED开启指令发送成功");
+        vTaskDelay(pdMS_TO_TICKS(AS7341_LED_TEST_TIME_MS));
+        ESP_LOGI(TAG, "LED测试延迟%u ms结束", AS7341_LED_TEST_TIME_MS);
+
+        bool led_enabled;
+        as7341_led_drive_strengths_t led_current;
+        ret = as7341GetLedStatus(&led_enabled, &led_current);
+        if (ret == ESP_OK) {
+            int current_ma = 4 + (int)led_current * 2;
+            ESP_LOGI(TAG, "LED实际状态: %s", led_enabled ? "开启" : "关闭");
+            ESP_LOGI(TAG, "LED实际驱动电流: %dmA", current_ma);
+
+            if (led_enabled) {
+                ESP_LOGI(TAG, "✓ LED硬件验证通过");
+            } else {
+                ESP_LOGW(TAG, "✗ LED硬件验证失败 - LED未实际开启");
+            }
+        }
+
+        ret = as7341_disable_led(g_as7341);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "✓ LED关闭指令发送成功");
+        }
+    }
+
+    ESP_LOGI(TAG, "========== AS7341硬件验证结束 ==========");
+
+    // 读取最终的LED配置进行总结
+    as7341_led_register_t final_led;
+    if (as7341_get_led_register(g_as7341, &final_led) == ESP_OK) {
+        int final_current_ma = 4 + (int)final_led.bits.led_drive_strength * 2;
+        ESP_LOGI(TAG, "LED配置总结:");
+        ESP_LOGI(TAG, "  - 测量稳定时间: %u ms", AS7341_LED_ON_TIME_MS);
+        ESP_LOGI(TAG, "  - 硬件检测时间: %u ms", AS7341_LED_TEST_TIME_MS);
+        ESP_LOGI(TAG, "  - 当前驱动电流: %d mA", final_current_ma);
+    } else {
+        ESP_LOGI(TAG, "LED配置总结:");
+        ESP_LOGI(TAG, "  - 测量稳定时间: %u ms", AS7341_LED_ON_TIME_MS);
+        ESP_LOGI(TAG, "  - 硬件检测时间: %u ms", AS7341_LED_TEST_TIME_MS);
+    }
+
+    return ESP_OK;
+}
+
 void as7341Deinit(void)
 {
+    // 安全的清理，支持多次调用
     if (g_as7341 != NULL) {
+        ESP_LOGI(TAG, "释放AS7341设备资源");
         as7341_delete(g_as7341);
         g_as7341 = NULL;
     }
+
     if (g_i2c_bus != NULL) {
+        ESP_LOGI(TAG, "释放I2C总线资源");
         i2c_del_master_bus(g_i2c_bus);
         g_i2c_bus = NULL;
     }
-    ESP_LOGI(TAG, "传感器资源已释放");
+
+    ESP_LOGI(TAG, "传感器资源已完整释放");
+}
+
+esp_err_t as7341SetLedCurrentMA(int current_ma) {
+    if (g_as7341 == NULL) {
+        ESP_LOGE(TAG, "传感器未初始化");
+        return ESP_FAIL;
+    }
+
+    int reg_value = (current_ma - 4) / 2;
+
+    if (reg_value < 0 || reg_value > 127) {
+        ESP_LOGE(TAG, "电流值%d超出范围(4-258mA)", current_ma);
+        return ESP_FAIL;
+    }
+
+    as7341_led_register_t led;
+    esp_err_t ret = as7341_get_led_register(g_as7341, &led);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "读取LED寄存器失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    led.bits.led_drive_strength = reg_value;
+    led.bits.led_ldr_enabled = false;  // 低电平激活模式
+    ret = as7341_set_led_register(g_as7341, led);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "设置LED驱动电流失败: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "LED驱动电流设置为: %dmA (寄存器值: %d, 低电平激活模式)", current_ma, reg_value);
+    return ESP_OK;
+}
+
+void as7341TestLedCurrent(void) {
+    if (g_as7341 == NULL) {
+        ESP_LOGE(TAG, "传感器未初始化，无法进行LED测试");
+        return;
+    }
+
+    ESP_LOGI(TAG, "========== LED驱动电流测试开始(低电平激活模式) ==========");
+
+    int test_currents[] = {12, 50, 100, 200, 258};
+    int test_count = sizeof(test_currents) / sizeof(test_currents[0]);
+
+    for (int i = 0; i < test_count; i++) {
+        ESP_LOGI(TAG, "");
+        ESP_LOGI(TAG, "========== 测试LED电流: %dmA (%d/%d) ==========",
+                 test_currents[i], i + 1, test_count);
+
+        esp_err_t ret = as7341SetLedCurrentMA(test_currents[i]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "设置LED电流失败，跳过此测试");
+            continue;
+        }
+
+        ret = as7341_enable_led(g_as7341);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "开启LED失败: %s", esp_err_to_name(ret));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "LED已开启(低电平)，电流: %dmA", test_currents[i]);
+        ESP_LOGI(TAG, "请观察LED亮度效果...");
+        ESP_LOGI(TAG, "等待5秒后继续下一轮测试...");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+
+        ret = as7341_disable_led(g_as7341);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "关闭LED失败: %s", esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "LED已关闭(低电平)");
+        }
+
+        ESP_LOGI(TAG, "等待2秒后进行下一轮测试...");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+
+    ESP_LOGI(TAG, "========== LED驱动电流测试完成(低电平激活模式) ==========");
+    ESP_LOGI(TAG, "LED测试总结:");
+    ESP_LOGI(TAG, "  - LED控制模式: 低电平激活(LDR低电平=LED开)");
+    ESP_LOGI(TAG, "  - 测试电流档位: 12mA, 50mA, 100mA, 200mA, 258mA");
+    ESP_LOGI(TAG, "  - 每个档位测试时间: 5秒");
+    ESP_LOGI(TAG, "  - 档位切换间隔: 2秒");
+}
+
+bool as7341IsInitialized(void) {
+    return (g_as7341 != NULL) && (g_i2c_bus != NULL);
 }

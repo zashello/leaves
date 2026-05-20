@@ -10,6 +10,7 @@
 #include "storage/storage.h"
 #include "driver/driver_button.h"
 #include "driver/driver_scd41.h"
+#include "driver/driver_as7341.h"
 #include "system/system_log.h"
 #include "system/menu_system.h"
 #include "system/menu_display.h"
@@ -65,6 +66,27 @@ void app_main(void)
     } else {
         systemLogAdd(LOG_LEVEL_INFO, "SCD41 INIT OK");
     }
+
+    // AS7341初始化 - 配置LED控制
+    ret = as7341Init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "AS7341 INIT FAIL: %s", esp_err_to_name(ret));
+        systemLogAdd(LOG_LEVEL_ERROR, "AS7341 INIT FAIL");
+        appStateSet(APP_STATE_ERROR);
+        return;
+    } else {
+        systemLogAdd(LOG_LEVEL_INFO, "AS7341 INIT OK");
+    }
+
+    // AS7341硬件检测 - 验证LED控制功能
+    ESP_LOGI(TAG, "开始AS7341硬件检测...");
+    as7341VerifyHardware();
+    systemLogAdd(LOG_LEVEL_INFO, "AS7341 HARDWARE CHECK DONE");
+
+    // LED电流测试 - 可选的详细测试功能
+    // ESP_LOGI(TAG, "开始LED驱动电流测试...");
+    // as7341TestLedCurrent();
+    // systemLogAdd(LOG_LEVEL_INFO, "LED CURRENT TEST DONE");
 
     ret = displayServiceInit();
     if (ret == ESP_OK) {

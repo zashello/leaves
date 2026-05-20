@@ -106,6 +106,7 @@ static void sensorTask(void *param)
             continue;
         }
 
+        // 使用幂等性安全的as7341Init()函数，支持重复调用
         esp_err_t ret = as7341Init();
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "AS7341初始化失败");
@@ -281,6 +282,7 @@ void sensorServiceReportOnce(void)
 
     ESP_LOGI(TAG, "立即采集传感器数据并上报");
 
+    // 使用幂等性安全的as7341Init()函数，支持重复调用
     esp_err_t ret = as7341Init();
     if (ret == ESP_OK) {
         as7341_channels_spectral_data_t spectralData;

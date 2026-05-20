@@ -18,6 +18,8 @@
 #define AS7341_I2C_SCL         5
 #define AS7341_I2C_SDA         4
 #define AS7341_I2C_FREQ        100000
+#define AS7341_LED_ON_TIME_MS  1000
+#define AS7341_LED_TEST_TIME_MS 1000
 
 #define SCD41_I2C_SCL          15
 #define SCD41_I2C_SDA          18
