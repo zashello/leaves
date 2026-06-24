@@ -164,7 +164,7 @@ const ei_impulse_t impulse_996344_4 = {
     .project_name = "zsh2451-project-1",
     .impulse_id = 4,
     .impulse_name = "Impulse #4",
-    .deploy_version = 6,
+    .deploy_version = 7,
 
     .nn_input_frame_size = 12,
     .raw_sample_count = 1,
