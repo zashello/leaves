@@ -1,5 +1,5 @@
-set(EI_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/edge-impulse-sdk")
-set(EI_MODEL_DIR "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/tflite-model")
+set(EI_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/edge-impulse-sdk")
+set(EI_MODEL_DIR "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/tflite-model")
 
 file(GLOB_RECURSE EI_SDK_CPP_SRCS "${EI_SDK_DIR}/*.cpp")
 file(GLOB_RECURSE EI_SDK_CC_SRCS "${EI_SDK_DIR}/*.cc")
@@ -45,6 +45,7 @@ idf_component_register(
         "driver/driver_button.c"
         "driver/ei_classifier.cpp"
         "driver/driver_i2c_soft.c"
+        "driver/driver_led_light.c"
         "driver/driver_ssd1306.c"
         "storage/storage.c"
         "network/wifi_sta.c"
@@ -78,15 +79,15 @@ idf_component_register(
         "./service"
         "./system"
         "./tasks"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/edge-impulse-sdk"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/edge-impulse-sdk/porting"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/edge-impulse-sdk/porting/espressif"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/edge-impulse-sdk/porting/espressif/ESP-NN/include"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/edge-impulse-sdk/porting/espressif/esp-dsp/modules/common/include"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/edge-impulse-sdk/porting/espressif/esp-dsp/modules/fft/include"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/model-parameters"
-        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v5-impulse-#4/tflite-model"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/edge-impulse-sdk"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/edge-impulse-sdk/porting"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/edge-impulse-sdk/porting/espressif"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/edge-impulse-sdk/porting/espressif/ESP-NN/include"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/edge-impulse-sdk/porting/espressif/esp-dsp/modules/common/include"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/edge-impulse-sdk/porting/espressif/esp-dsp/modules/fft/include"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/model-parameters"
+        "${CMAKE_CURRENT_LIST_DIR}/zsh2451-project-1-cpp-mcu-v6-impulse-#4/tflite-model"
     REQUIRES
         esp_driver_ledc
         esp_driver_gpio

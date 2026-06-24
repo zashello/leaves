@@ -13,3 +13,6 @@ void actionDisconnectWifi(void);
 void actionMqttStatus(void);
 void actionTriggerUpload(void);
 void actionTriggerAi(void);
+void actionLedLightOn(void);
+void actionLedLightOff(void);
+void actionLedBrightness(void);

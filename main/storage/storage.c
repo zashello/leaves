@@ -22,6 +22,8 @@ static const char *KEY_ENABLE_MQTT = "enable_mqtt";
 static const char *KEY_ENABLE_AI = "enable_ai";
 static const char *KEY_ENABLE_AUTO_NET = "enable_auto_net";
 static const char *KEY_MQTT_REPORT_INTERVAL = "mqtt_interval";
+static const char *KEY_LED_ENABLED = "led_enabled";
+static const char *KEY_LED_BRIGHTNESS = "led_bright";
 
 esp_err_t storageInit(void)
 {
@@ -110,6 +112,14 @@ esp_err_t storageLoad(device_config_t *config)
         config->mqttReportInterval = reportInterval;
     }
 
+    uint8_t ledEnabled = 0;
+    nvs_get_u8(handle, KEY_LED_ENABLED, &ledEnabled);
+    config->ledLightEnabled = (ledEnabled == 1);
+
+    uint8_t ledBrightness = 0;
+    nvs_get_u8(handle, KEY_LED_BRIGHTNESS, &ledBrightness);
+    config->ledLightBrightness = ledBrightness;
+
     config->configValid = true;
     nvs_close(handle);
 
@@ -165,6 +175,12 @@ esp_err_t storageSave(const device_config_t *config)
     if (ret != ESP_OK) goto save_err;
 
     ret = nvs_set_u16(handle, KEY_MQTT_REPORT_INTERVAL, config->mqttReportInterval);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_u8(handle, KEY_LED_ENABLED, config->ledLightEnabled ? 1 : 0);
+    if (ret != ESP_OK) goto save_err;
+
+    ret = nvs_set_u8(handle, KEY_LED_BRIGHTNESS, config->ledLightBrightness);
     if (ret != ESP_OK) goto save_err;
 
     ret = nvs_set_u8(handle, KEY_VALID, 1);

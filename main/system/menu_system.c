@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -7,9 +8,12 @@
 #include "menu_display.h"
 #include "menu_actions.h"
 #include "system/system_log.h"
+#include "driver/driver_led_light.h"
+#include "storage/storage.h"
 
 extern const menu_item_t gSysConfigMenu[];
 extern const menu_item_t gWifiConfigMenu[];
+extern const menu_item_t gLedLightMenu[];
 extern const menu_item_t gNetworkMenu[];
 
 static const char *TAG = "MENU_SYS";
@@ -25,10 +29,19 @@ static const menu_item_t gRootMenu[] = {
     {NULL}
 };
 
+const menu_item_t gLedLightMenu[] = {
+    {"TURN ON",         MENU_ITEM_TYPE_ACTION,   actionLedLightOn,       NULL},
+    {"TURN OFF",        MENU_ITEM_TYPE_ACTION,   actionLedLightOff,      NULL},
+    {"BRIGHTNESS",      MENU_ITEM_TYPE_ACTION,   actionLedBrightness,    NULL},
+    {"BACK",            MENU_ITEM_TYPE_BACK,     NULL,                   NULL},
+    {NULL}
+};
+
 const menu_item_t gSysConfigMenu[] = {
     {"WIFI CONFIG",     MENU_ITEM_TYPE_SUBMENU,  NULL,                   gWifiConfigMenu},
     {"SYSTEM LOG",      MENU_ITEM_TYPE_ACTION,   actionShowLog,          NULL},
     {"CLEAR LOG",       MENU_ITEM_TYPE_ACTION,   actionClearLog,         NULL},
+    {"LIGHT CTRL",      MENU_ITEM_TYPE_SUBMENU,  NULL,                   gLedLightMenu},
     {"REBOOT",          MENU_ITEM_TYPE_ACTION,   actionReboot,           NULL},
     {"FACTORY RESET",   MENU_ITEM_TYPE_ACTION,   actionFactoryReset,     NULL},
     {"BACK",            MENU_ITEM_TYPE_BACK,     NULL,                   NULL},
@@ -88,6 +101,9 @@ void menuSystemShow(void)
         case MENU_STATE_DATA_VIEW:
             break;
         case MENU_STATE_CONFIRM:
+            break;
+        case MENU_STATE_BRIGHTNESS:
+            menuDisplayShowBrightness(gCtx.adjustValue);
             break;
     }
 }
@@ -181,6 +197,37 @@ void menuSystemHandleEvent(button_event_t event)
                 gCtx.confirmAction = NULL;
                 gCtx.state = MENU_STATE_READY;
                 systemLogAdd(LOG_LEVEL_INFO, "CONFIRM CANCELLED");
+            }
+            break;
+
+        case MENU_STATE_BRIGHTNESS:
+            if (event == BUTTON_EVENT_UP) {
+                int v = gCtx.adjustValue + LED_LIGHT_BRIGHT_STEP;
+                if (v > LED_LIGHT_BRIGHT_MAX) v = LED_LIGHT_BRIGHT_MAX;
+                gCtx.adjustValue = (uint8_t)v;
+            } else if (event == BUTTON_EVENT_DOWN) {
+                int v = gCtx.adjustValue;
+                if (v >= LED_LIGHT_BRIGHT_STEP) {
+                    v -= LED_LIGHT_BRIGHT_STEP;
+                } else {
+                    v = LED_LIGHT_BRIGHT_MIN;
+                }
+                gCtx.adjustValue = (uint8_t)v;
+            } else if (event == BUTTON_EVENT_CONFIRM) {
+                ledLightSetBrightness(gCtx.adjustValue);
+                device_config_t config;
+                if (storageLoad(&config) == ESP_OK) {
+                    config.ledLightEnabled = (gCtx.adjustValue > 0);
+                    config.ledLightBrightness = gCtx.adjustValue;
+                    storageSave(&config);
+                }
+                char msg[32];
+                snprintf(msg, sizeof(msg), "BRIGHTNESS: %d%%", gCtx.adjustValue);
+                systemLogAdd(LOG_LEVEL_INFO, msg);
+                gCtx.state = MENU_STATE_READY;
+            } else if (event == BUTTON_EVENT_BACK) {
+                gCtx.state = MENU_STATE_READY;
+                systemLogAdd(LOG_LEVEL_INFO, "BRIGHTNESS CANCELLED");
             }
             break;
 

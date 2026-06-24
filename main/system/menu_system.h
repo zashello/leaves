@@ -24,7 +24,8 @@ typedef enum {
     MENU_STATE_READY = 0,
     MENU_STATE_WAITING,
     MENU_STATE_DATA_VIEW,
-    MENU_STATE_CONFIRM
+    MENU_STATE_CONFIRM,
+    MENU_STATE_BRIGHTNESS
 } menu_state_t;
 
 typedef struct {
@@ -37,6 +38,7 @@ typedef struct {
     bool initialized;
     TickType_t lastActivity;
     void (*confirmAction)(void);
+    uint8_t adjustValue;
 } menu_context_t;
 
 void menuSystemInit(void);
@@ -48,3 +50,4 @@ void menuSystemSetState(menu_state_t state);
 menu_context_t* menuSystemGetContext(void);
 void menuSystemResetTimeout(void);
 void menuSystemCheckTimeout(void);
+void menuReturnToRoot(void);

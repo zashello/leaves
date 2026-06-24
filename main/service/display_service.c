@@ -61,10 +61,10 @@ void displayServiceShowInitScreen(void)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(46, 47);
+    ssd1306SetCursor(37, 48);
     ssd1306Print("LEAVES");
 
-    ssd1306SetCursor(43, 39);
+    ssd1306SetCursor(32, 32);
     ssd1306Print("MONITOR");
 
     ssd1306Display();
@@ -85,7 +85,7 @@ void displayServiceUpdate(const ei_inference_result_t *result)
         return;
     }
 
-    char label1[32], label2[32], label3[32], label4[32];
+    char label1[9], label2[9], label3[9], label4[9];
 
     snprintf(label1, sizeof(label1), "%s", result->results[0].label);
     snprintf(label2, sizeof(label2), "%s", result->results[1].label);
@@ -99,27 +99,23 @@ void displayServiceUpdate(const ei_inference_result_t *result)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(1, 0);
+    ssd1306SetCursor(0, 48);
     ssd1306Print(label1);
-    ssd1306Print("  ");
     ssd1306PrintFloat(result->results[0].value * 100.0f, 1);
     ssd1306Print("%");
 
-    ssd1306SetCursor(1, 10);
+    ssd1306SetCursor(0, 32);
     ssd1306Print(label2);
-    ssd1306Print("  ");
     ssd1306PrintFloat(result->results[1].value * 100.0f, 1);
     ssd1306Print("%");
 
-    ssd1306SetCursor(1, 20);
+    ssd1306SetCursor(0, 16);
     ssd1306Print(label3);
-    ssd1306Print("  ");
     ssd1306PrintFloat(result->results[2].value * 100.0f, 1);
     ssd1306Print("%");
 
-    ssd1306SetCursor(1, 30);
+    ssd1306SetCursor(0, 0);
     ssd1306Print(label4);
-    ssd1306Print("  ");
     ssd1306PrintFloat(result->results[3].value * 100.0f, 1);
     ssd1306Print("%");
 

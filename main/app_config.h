@@ -76,11 +76,17 @@
 
 #define MENU_MAX_DEPTH         3
 #define MENU_TIMEOUT_MS        60000
-#define MENU_LINE_HEIGHT       10
-#define MENU_ITEMS_PER_SCREEN  5
+#define MENU_LINE_HEIGHT       16
+#define MENU_ITEMS_PER_SCREEN  3
 
 #define LOG_MAX_ENTRIES        10
 #define LOG_ENTRY_SIZE         128
+
+#define LED_LIGHT_GPIO           16
+#define LEDC_LED_FREQ            4000
+#define LED_LIGHT_BRIGHT_MIN     0
+#define LED_LIGHT_BRIGHT_MAX     100
+#define LED_LIGHT_BRIGHT_STEP    10
 
 typedef struct {
     char wifiSsid[WIFI_SSID_MAX_LEN];
@@ -97,4 +103,6 @@ typedef struct {
     bool enableAiService;
     bool enableAutoNetwork;
     uint16_t mqttReportInterval;
+    bool ledLightEnabled;
+    uint8_t ledLightBrightness;
 } device_config_t;

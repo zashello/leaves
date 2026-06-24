@@ -19,6 +19,7 @@
 #include "service/sensor_service.h"
 #include "service/ai_service.h"
 #include "service/notify.h"
+#include "driver/driver_led_light.h"
 
 static const char *TAG = "MENU_ACT";
 
@@ -143,6 +144,8 @@ static void executeShowLog(void *param)
 
     vTaskDelete(NULL);
 }
+
+
 
 void actionShowLog(void)
 {
@@ -348,4 +351,46 @@ void actionTriggerAi(void)
     }
     menuSystemEnterWaiting("AI ANALYSIS...");
     xTaskCreate(executeAi, "ai_task", 12288, NULL, 5, NULL);
+}
+
+static void executeLedOn(void *param)
+{
+    ledLightSetBrightness(LED_LIGHT_BRIGHT_MAX);
+    systemLogAdd(LOG_LEVEL_INFO, "LED LIGHT ON");
+    menuDisplayShowSuccess("LED ON");
+    vTaskDelay(pdMS_TO_TICKS(1500));
+    menuSystemExitWaiting();
+    menuSystemShow();
+    vTaskDelete(NULL);
+}
+
+void actionLedLightOn(void)
+{
+    menuSystemEnterWaiting("TURN ON LED...");
+    xTaskCreate(executeLedOn, "led_on", 2048, NULL, 5, NULL);
+}
+
+static void executeLedOff(void *param)
+{
+    ledLightSetBrightness(LED_LIGHT_BRIGHT_MIN);
+    systemLogAdd(LOG_LEVEL_INFO, "LED LIGHT OFF");
+    menuDisplayShowSuccess("LED OFF");
+    vTaskDelay(pdMS_TO_TICKS(1500));
+    menuSystemExitWaiting();
+    menuSystemShow();
+    vTaskDelete(NULL);
+}
+
+void actionLedLightOff(void)
+{
+    menuSystemEnterWaiting("TURN OFF LED...");
+    xTaskCreate(executeLedOff, "led_off", 2048, NULL, 5, NULL);
+}
+
+void actionLedBrightness(void)
+{
+    menu_context_t *ctx = menuSystemGetContext();
+    ctx->adjustValue = ledLightGetBrightness();
+    ctx->state = MENU_STATE_BRIGHTNESS;
+    systemLogAdd(LOG_LEVEL_INFO, "BRIGHTNESS ADJUST MODE");
 }

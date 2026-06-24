@@ -20,6 +20,7 @@
 #include "service/sensor_service.h"
 #include "service/ha_integration.h"
 #include "service/ai_service.h"
+#include "driver/driver_led_light.h"
 
 static const char *TAG = "APP";
 
@@ -116,6 +117,14 @@ void app_main(void)
 
     eiClassifierInit();
     systemLogAdd(LOG_LEVEL_INFO, "EI CLASSIFIER INIT OK");
+
+    ret = ledLightInit();
+    if (ret == ESP_OK) {
+        systemLogAdd(LOG_LEVEL_INFO, "LED LIGHT INIT OK");
+    } else {
+        ESP_LOGW(TAG, "LED LIGHT INIT FAIL");
+        systemLogAdd(LOG_LEVEL_WARNING, "LED LIGHT INIT FAIL");
+    }
 
     menuSystemInit();
     systemLogAdd(LOG_LEVEL_INFO, "MENU SYSTEM READY");
@@ -228,6 +237,12 @@ void app_main(void)
                 vTaskDelay(pdMS_TO_TICKS(1500));
             }
         }
+    }
+
+    device_config_t ledRestoreConfig;
+    if (storageLoad(&ledRestoreConfig) == ESP_OK && ledRestoreConfig.configValid && ledRestoreConfig.ledLightEnabled) {
+        ledLightSetBrightness(ledRestoreConfig.ledLightBrightness);
+        systemLogAdd(LOG_LEVEL_INFO, "LED STATE RESTORED");
     }
 
     appStateSet(APP_STATE_RUNNING);

@@ -16,3 +16,4 @@ void menuDisplayShowError(const char *message);
 void menuDisplayShowSuccess(const char *message);
 void menuDisplayShowLogEntry(const log_entry_t *entry, int index, int total);
 void menuDisplayShowAbout(void);
+void menuDisplayShowBrightness(uint8_t brightness);

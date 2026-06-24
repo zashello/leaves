@@ -48,12 +48,12 @@
 
 const char* ei_classifier_inferencing_categories_996344_4[] = { "Diseased", "Healthy", "Low_Nutrient", "Low_Water" };
 
-EI_CLASSIFIER_DSP_AXES_INDEX_TYPE ei_dsp_config_996344_22_axes[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
-const uint32_t ei_dsp_config_996344_22_axes_size = 13;
+EI_CLASSIFIER_DSP_AXES_INDEX_TYPE ei_dsp_config_996344_22_axes[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+const uint32_t ei_dsp_config_996344_22_axes_size = 12;
 ei_dsp_config_flatten_t ei_dsp_config_996344_22 = {
     22, // uint32_t blockId
     1, // int implementationVersion
-    13, // int length of axes
+    12, // int length of axes
     1.0f, // float scale-axes
     true, // boolean average
     false, // boolean minimum
@@ -65,16 +65,16 @@ ei_dsp_config_flatten_t ei_dsp_config_996344_22 = {
     0 // int moving_avg_num_windows
 };
 
-const float ei_dn_standard_scaler_mean_996344_22[13] = { 543.0016722991853, 690.1206595902661, 809.4126383357167, 1222.4262933015896, 1393.1056322793588, 938.6461324700321, 701.6787041925409, 757.4628196906644, 1289.1019260713083, 4559.181294984023, 0.6971025303950016, 0.5193262533942797, -0.12929688416358678 };
-const float ei_dn_standard_scaler_scale_996344_22[13] = { 0.0056718046772591705, 0.004468751782833265, 0.0045324665803808195, 0.005642318067455729, 0.0048377078703921664, 0.006232456249274028, 0.0037774569725300654, 0.0024662083569712313, 0.004275245996789926, 0.0009240305634905283, 5.681303791685462, 11.086949478135386, 14.258331607666873 };
-const float ei_dn_standard_scaler_var_996344_22[13] = { 31085.47207916137, 50075.75837152058, 48677.78171676197, 31411.22481142036, 42728.80243219139, 25744.32580508027, 70081.106086841, 164414.63393771712, 54711.394204868884, 1171189.9239856699, 0.030981609441305395, 0.00813534290125016, 0.004918838664393866 };
+const float ei_dn_standard_scaler_mean_996344_22[12] = { 1802.9924397744746, 2098.859815479241, 2356.394925679139, 3447.1736289082523, 5486.018067657611, 4442.257560225526, 3920.5394669400307, 3417.570092260379, 25767.435033316247, 0.7550390130311987, 0.6501737504419494, -0.06915309808802655 };
+const float ei_dn_standard_scaler_scale_996344_22[12] = { 0.00079850554068373, 0.0007439428902087828, 0.0006752951983482708, 0.000477405294790744, 0.00032993684414457555, 0.0003763700336305957, 0.00038804876277004395, 0.0003906000861273945, 0.00013473390639848592, 6.085647697290644, 7.476042699305941, 11.007303390051131 };
+const float ei_dn_standard_scaler_var_996344_22[12] = { 1568354.1305169067, 1806844.6110505043, 2192868.941932222, 4387584.94153419, 9186252.274276324, 7059434.683022033, 6640906.930144054, 6554436.05082772, 55086628.99385726, 0.027001406417407944, 0.017891899648029508, 0.008253499439645746 };
 ei_data_normalization_standard_scaler_config_t ei_data_normalization_standard_scaler_config_996344_22 = {
     .mean_data = (float *)ei_dn_standard_scaler_mean_996344_22,
-    .mean_data_len = 13,
+    .mean_data_len = 12,
     .scale_data = (float *)ei_dn_standard_scaler_scale_996344_22,
-    .scale_data_len = 13,
+    .scale_data_len = 12,
     .var_data = (float *)ei_dn_standard_scaler_var_996344_22,
-    .var_data_len = 13
+    .var_data_len = 12
 };
 ei_data_normalization_t ei_data_normalization_config_996344_22 = {
     (void *) &ei_data_normalization_standard_scaler_config_996344_22, // config
@@ -89,7 +89,7 @@ const uint8_t ei_dsp_blocks_996344_4_size = 1;
 ei_model_dsp_t ei_dsp_blocks_996344_4[ei_dsp_blocks_996344_4_size] = {
     { // DSP block 22
         22,
-        13, // output size
+        12, // output size
         &extract_flatten_features, // DSP function pointer
         (void*)&ei_dsp_config_996344_22, // pointer to config struct
         ei_dsp_config_996344_22_axes, // array of offsets into the input stream, one for each axis
@@ -164,12 +164,12 @@ const ei_impulse_t impulse_996344_4 = {
     .project_name = "zsh2451-project-1",
     .impulse_id = 4,
     .impulse_name = "Impulse #4",
-    .deploy_version = 5,
+    .deploy_version = 6,
 
-    .nn_input_frame_size = 13,
+    .nn_input_frame_size = 12,
     .raw_sample_count = 1,
-    .raw_samples_per_frame = 13,
-    .dsp_input_frame_size = 1 * 13,
+    .raw_samples_per_frame = 12,
+    .dsp_input_frame_size = 1 * 12,
     .input_width = 0,
     .input_height = 0,
     .input_frames = 0,
@@ -190,7 +190,7 @@ const ei_impulse_t impulse_996344_4 = {
     .inferencing_engine = EI_CLASSIFIER_TFLITE,
 
     .sensor = EI_CLASSIFIER_SENSOR_FUSION,
-    .fusion_string = "F1_415nm + F2_445nm + F3_480nm + F4_515nm + F5_555nm + F6_590nm + F7_630nm + F8_680nm + NIR + Clear + NDVI + GNDVI + PSRI",
+    .fusion_string = "F1_415nm + F2_445nm + F3_480nm + F4_515nm + F5_555nm + F6_590nm + F7_630nm + F8_680nm + NIR + NDVI + GNDVI + PSRI",
     .slice_size = (1/4),
     .slices_per_model_window = 4,
 

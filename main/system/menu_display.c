@@ -48,10 +48,10 @@ void menuDisplayShowWaiting(const char *message)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 10);
+    ssd1306SetCursor(0, 32);
     ssd1306Print(message);
 
-    ssd1306SetCursor(0, 30);
+    ssd1306SetCursor(0, 16);
     ssd1306Print("PLEASE WAIT...");
 
     ssd1306Display();
@@ -65,22 +65,18 @@ void menuDisplayShowScd41Data(const scd41_data_t *data)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 0);
+    ssd1306SetCursor(0, 48);
     ssd1306Print("SCD41 DATA");
 
-    ssd1306SetCursor(0, 12);
-    snprintf(buf, sizeof(buf), "CO2 LEVEL : %u PPM", data->co2_ppm);
-    ssd1306Print(buf);
-
-    ssd1306SetCursor(0, 22);
-    snprintf(buf, sizeof(buf), "TEMPERATURE: %.1f C", data->temperature_c);
-    ssd1306Print(buf);
-
     ssd1306SetCursor(0, 32);
-    snprintf(buf, sizeof(buf), "HUMIDITY   : %.1f RH", data->humidity_rh);
+    snprintf(buf, sizeof(buf), "CO2:%u PPM", data->co2_ppm);
     ssd1306Print(buf);
 
-    ssd1306SetCursor(0, 50);
+    ssd1306SetCursor(0, 16);
+    snprintf(buf, sizeof(buf), "T:%.1fC H:%.1f%%", data->temperature_c, data->humidity_rh);
+    ssd1306Print(buf);
+
+    ssd1306SetCursor(0, 0);
     ssd1306Print("PRESS BACK");
 
     ssd1306Display();
@@ -91,50 +87,33 @@ void menuDisplayShowPlantAnalysis(const ei_inference_result_t *result)
     if (result == NULL) return;
 
     char buf[64];
+    char upLabel[9] = {0};
 
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 0);
+    ssd1306SetCursor(0, 48);
     ssd1306Print("PLANT ANALYSIS");
 
-    ssd1306SetCursor(0, 10);
-    snprintf(buf, sizeof(buf), "DISEASED : %.1f%%", result->results[0].value * 100.0f);
-    ssd1306Print(buf);
-
-    ssd1306SetCursor(0, 19);
-    snprintf(buf, sizeof(buf), "HEALTHY  : %.1f%%", result->results[1].value * 100.0f);
-    ssd1306Print(buf);
-
-    ssd1306SetCursor(0, 28);
-    snprintf(buf, sizeof(buf), "LOW NUTR: %.1f%%", result->results[2].value * 100.0f);
-    ssd1306Print(buf);
-
-    ssd1306SetCursor(0, 37);
-    snprintf(buf, sizeof(buf), "LOW WATER: %.1f%%", result->results[3].value * 100.0f);
-    ssd1306Print(buf);
-
     if (result->bestLabel != NULL) {
-        ssd1306SetCursor(0, 48);
-
-        char upperLabel[32] = {0};
         int len = 0;
-        for (int i = 0; i < 31 && result->bestLabel[i] != '\0'; i++) {
-            if (result->bestLabel[i] >= 'a' && result->bestLabel[i] <= 'z') {
-                upperLabel[i] = result->bestLabel[i] - 32;
-            } else if (result->bestLabel[i] == '_') {
-                upperLabel[i] = ' ';
-            } else {
-                upperLabel[i] = result->bestLabel[i];
-            }
+        for (int i = 0; i < 8 && result->bestLabel[i] != '\0'; i++) {
+            upLabel[i] = (result->bestLabel[i] >= 'a' && result->bestLabel[i] <= 'z')
+                         ? result->bestLabel[i] - 32 : result->bestLabel[i];
+            if (upLabel[i] == '_') upLabel[i] = ' ';
             len = i + 1;
         }
-        upperLabel[len] = '\0';
-
-        snprintf(buf, sizeof(buf), "BEST: %.20s", upperLabel);
-        ssd1306Print(buf);
+        upLabel[len] = '\0';
     }
 
-    ssd1306SetCursor(0, 58);
+    ssd1306SetCursor(0, 32);
+    snprintf(buf, sizeof(buf), "BEST:%.8s %.1f%%", upLabel, result->results[0].value * 100.0f);
+    ssd1306Print(buf);
+
+    ssd1306SetCursor(0, 16);
+    snprintf(buf, sizeof(buf), "2ND: %.1f%%", result->results[1].value * 100.0f);
+    ssd1306Print(buf);
+
+    ssd1306SetCursor(0, 0);
     ssd1306Print("PRESS BACK");
 
     ssd1306Display();
@@ -146,7 +125,7 @@ void menuDisplayShowMessage(const char *message)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 25);
+    ssd1306SetCursor(0, 32);
     ssd1306Print(message);
 
     ssd1306Display();
@@ -158,13 +137,13 @@ void menuDisplayShowConfirm(const char *message)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 10);
+    ssd1306SetCursor(0, 32);
     ssd1306Print(message);
 
-    ssd1306SetCursor(0, 35);
+    ssd1306SetCursor(0, 16);
     ssd1306Print("OK=CONFIRM");
 
-    ssd1306SetCursor(0, 47);
+    ssd1306SetCursor(0, 0);
     ssd1306Print("BACK=CANCEL");
 
     ssd1306Display();
@@ -174,18 +153,18 @@ void menuDisplayShowWifiAp(const char *ssid, const char *ip)
 {
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 0);
+    ssd1306SetCursor(0, 48);
     ssd1306Print("PROVISION MODE");
 
-    ssd1306SetCursor(0, 15);
+    ssd1306SetCursor(0, 32);
     ssd1306Print("SSID:");
     if (ssid) ssd1306Print(ssid);
 
-    ssd1306SetCursor(0, 27);
+    ssd1306SetCursor(0, 16);
     ssd1306Print("IP:");
     if (ip) ssd1306Print(ip);
 
-    ssd1306SetCursor(0, 45);
+    ssd1306SetCursor(0, 0);
     ssd1306Print("PRESS BACK");
 
     ssd1306Display();
@@ -197,13 +176,13 @@ void menuDisplayShowError(const char *message)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 10);
+    ssd1306SetCursor(0, 48);
     ssd1306Print("ERROR!");
 
-    ssd1306SetCursor(0, 25);
+    ssd1306SetCursor(0, 32);
     ssd1306Print(message);
 
-    ssd1306SetCursor(0, 50);
+    ssd1306SetCursor(0, 0);
     ssd1306Print("PRESS BACK");
 
     ssd1306Display();
@@ -213,11 +192,11 @@ void menuDisplayShowSuccess(const char *message)
 {
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 20);
+    ssd1306SetCursor(0, 32);
     ssd1306Print("SUCCESS");
 
     if (message) {
-        ssd1306SetCursor(0, 35);
+        ssd1306SetCursor(0, 16);
         ssd1306Print(message);
     }
 
@@ -232,11 +211,11 @@ void menuDisplayShowLogEntry(const log_entry_t *entry, int index, int total)
 
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 0);
+    ssd1306SetCursor(0, 48);
     snprintf(buf, sizeof(buf), "LOG %d/%d", index + 1, total);
     ssd1306Print(buf);
 
-    ssd1306SetCursor(0, 12);
+    ssd1306SetCursor(0, 32);
     switch (entry->level) {
         case LOG_LEVEL_INFO:     ssd1306Print("[INFO]");   break;
         case LOG_LEVEL_WARNING:  ssd1306Print("[WARN]");   break;
@@ -244,10 +223,10 @@ void menuDisplayShowLogEntry(const log_entry_t *entry, int index, int total)
         case LOG_LEVEL_CRITICAL: ssd1306Print("[CRIT]");   break;
     }
 
-    ssd1306SetCursor(0, 24);
+    ssd1306SetCursor(0, 16);
     ssd1306Print(entry->message);
 
-    ssd1306SetCursor(0, 50);
+    ssd1306SetCursor(0, 0);
     ssd1306Print("PRESS BACK");
 
     ssd1306Display();
@@ -257,20 +236,39 @@ void menuDisplayShowAbout(void)
 {
     ssd1306Clear();
 
-    ssd1306SetCursor(0, 0);
+    ssd1306SetCursor(0, 48);
     ssd1306Print("LEAVES MONITOR");
 
-    ssd1306SetCursor(0, 12);
+    ssd1306SetCursor(0, 32);
     ssd1306Print("VER: 1.0");
 
-    ssd1306SetCursor(0, 24);
+    ssd1306SetCursor(0, 16);
     ssd1306Print("ESP32-S3");
 
-    ssd1306SetCursor(0, 36);
-    ssd1306Print("SPECTRAL+CO2");
-
-    ssd1306SetCursor(0, 50);
+    ssd1306SetCursor(0, 0);
     ssd1306Print("PRESS BACK");
+
+    ssd1306Display();
+}
+
+void menuDisplayShowBrightness(uint8_t brightness)
+{
+    char buf[32];
+
+    ssd1306Clear();
+
+    ssd1306SetCursor(0, 48);
+    ssd1306Print("LED BRIGHTNESS");
+
+    ssd1306SetCursor(0, 32);
+    snprintf(buf, sizeof(buf), "VAL: %d%%", brightness);
+    ssd1306Print(buf);
+
+    ssd1306SetCursor(0, 16);
+    ssd1306Print("OK=SAVE");
+
+    ssd1306SetCursor(0, 0);
+    ssd1306Print("BACK=CANCEL");
 
     ssd1306Display();
 }
