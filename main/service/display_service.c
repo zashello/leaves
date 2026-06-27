@@ -2,7 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "app_config.h"
-#include "driver/driver_ssd1306.h"
+#include "driver/driver_ssd1309.h"
 #include "service/display_service.h"
 #include "storage/storage.h"
 
@@ -29,19 +29,20 @@ esp_err_t displayServiceInit(void)
         return ESP_OK;
     }
 
-    ssd1306_config_t config = {
+    ssd1309_config_t config = {
         .width = OLED_WIDTH,
         .height = OLED_HEIGHT,
         .sclPin = OLED_I2C_SOFT_SCL,
         .sdaPin = OLED_I2C_SOFT_SDA,
+        .rstPin = OLED_RST_GPIO,
         .address = OLED_I2C_ADDRESS,
         .columnOffset = OLED_COLUMN_OFFSET,
         .pageOffset = OLED_PAGE_OFFSET
     };
 
-    esp_err_t ret = ssd1306Init(&config);
+    esp_err_t ret = ssd1309Init(&config);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "SSD1306初始化失败");
+        ESP_LOGE(TAG, "SSD1309初始化失败");
         return ret;
     }
 
@@ -59,15 +60,15 @@ void displayServiceShowInitScreen(void)
 
     ESP_LOGI(TAG, "显示初始化画面");
 
-    ssd1306Clear();
+    ssd1309Clear();
 
-    ssd1306SetCursor(37, 48);
-    ssd1306Print("LEAVES");
+    ssd1309SetCursor(37, 0);
+    ssd1309Print("LEAVES");
 
-    ssd1306SetCursor(32, 32);
-    ssd1306Print("MONITOR");
+    ssd1309SetCursor(32, 8);
+    ssd1309Print("MONITOR");
 
-    ssd1306Display();
+    ssd1309Display();
 
     vTaskDelay(pdMS_TO_TICKS(3000));
 
@@ -97,29 +98,29 @@ void displayServiceUpdate(const ei_inference_result_t *result)
     convertToUppercaseAndSpaces(label3);
     convertToUppercaseAndSpaces(label4);
 
-    ssd1306Clear();
+    ssd1309Clear();
 
-    ssd1306SetCursor(0, 48);
-    ssd1306Print(label1);
-    ssd1306PrintFloat(result->results[0].value * 100.0f, 1);
-    ssd1306Print("%");
+    ssd1309SetCursor(0, 0);
+    ssd1309Print(label1);
+    ssd1309PrintFloat(result->results[0].value * 100.0f, 1);
+    ssd1309Print("%");
 
-    ssd1306SetCursor(0, 32);
-    ssd1306Print(label2);
-    ssd1306PrintFloat(result->results[1].value * 100.0f, 1);
-    ssd1306Print("%");
+    ssd1309SetCursor(0, 8);
+    ssd1309Print(label2);
+    ssd1309PrintFloat(result->results[1].value * 100.0f, 1);
+    ssd1309Print("%");
 
-    ssd1306SetCursor(0, 16);
-    ssd1306Print(label3);
-    ssd1306PrintFloat(result->results[2].value * 100.0f, 1);
-    ssd1306Print("%");
+    ssd1309SetCursor(0, 16);
+    ssd1309Print(label3);
+    ssd1309PrintFloat(result->results[2].value * 100.0f, 1);
+    ssd1309Print("%");
 
-    ssd1306SetCursor(0, 0);
-    ssd1306Print(label4);
-    ssd1306PrintFloat(result->results[3].value * 100.0f, 1);
-    ssd1306Print("%");
+    ssd1309SetCursor(0, 24);
+    ssd1309Print(label4);
+    ssd1309PrintFloat(result->results[3].value * 100.0f, 1);
+    ssd1309Print("%");
 
-    ssd1306Display();
+    ssd1309Display();
 
     ESP_LOGI(TAG, "OLED显示已更新");
 }
@@ -128,7 +129,7 @@ void displayServiceDeinit(void)
 {
     if (!g_initialized) return;
 
-    ssd1306Deinit();
+    ssd1309Deinit();
     g_initialized = false;
 
     ESP_LOGI(TAG, "显示服务已释放");

@@ -208,7 +208,6 @@ void app_main(void)
                                 haIntegrationSetAiCallback(aiServiceRun);
                                 haIntegrationSetSensorCallback(sensorServiceReportOnce);
                                 printMqttIntegrationStatus();  // 调用诊断函数
-                                printMqttIntegrationStatus();  // 调用诊断函数
                             }
                         }
 

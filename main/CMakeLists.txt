@@ -46,7 +46,7 @@ idf_component_register(
         "driver/ei_classifier.cpp"
         "driver/driver_i2c_soft.c"
         "driver/driver_led_light.c"
-        "driver/driver_ssd1306.c"
+        "driver/driver_ssd1309.c"
         "storage/storage.c"
         "network/wifi_sta.c"
         "network/mqtt_client.c"
