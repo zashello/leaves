@@ -201,9 +201,9 @@ esp_err_t ssd1309Init(const ssd1309_config_t *config)
     gpio_config(&rstConf);
 
     gpio_set_level(g_config.rstPin, 0);
-    esp_rom_delay_us(20000);
+    esp_rom_delay_us(100000);
     gpio_set_level(g_config.rstPin, 1);
-    esp_rom_delay_us(20000);
+    esp_rom_delay_us(100000);
     ESP_LOGI(TAG, "SSD1309 RST复位完成");
   }
 
@@ -213,34 +213,59 @@ esp_err_t ssd1309Init(const ssd1309_config_t *config)
     return ret;
   }
 
+  bool ack3C = false, ack3D = false;
+
   i2cSoftStart();
-  i2cSoftSendByte(g_config.address << 1);
-  i2cSoftWaitAck();
+  i2cSoftSendByte(0x3C << 1);
+  ack3C = i2cSoftWaitAck();
   i2cSoftStop();
 
-  // SSD1309正确初始化序列
+  i2cSoftStart();
+  i2cSoftSendByte(0x3D << 1);
+  ack3D = i2cSoftWaitAck();
+  i2cSoftStop();
+
+  ESP_LOGI(TAG, "I2C扫描: 0x3C=%s, 0x3D=%s",
+           ack3C ? "ACK" : "无响应",
+           ack3D ? "ACK" : "无响应");
+
+  uint8_t detectedAddr = 0;
+  if (ack3C) detectedAddr = 0x3C;
+  else if (ack3D) detectedAddr = 0x3D;
+
+  if (detectedAddr == 0) {
+    ESP_LOGE(TAG, "未检测到OLED (扫描0x3C/0x3D均无响应)，请检查接线和供电");
+    return ESP_ERR_NOT_FOUND;
+  }
+
+  if (detectedAddr != g_config.address) {
+    ESP_LOGW(TAG, "OLED地址修正: 0x%02X → 0x%02X", g_config.address, detectedAddr);
+    g_config.address = detectedAddr;
+  }
+
+  // SSD1309初始化序列 (对齐模块参考代码)
   ssd1309WriteCommand2(0xFD, 0x12);  // 解锁命令锁
   ssd1309WriteCommand(0xAE);         // 显示OFF
   ssd1309WriteCommand2(0xD5, 0xA0);  // 时钟分频
   ssd1309WriteCommand2(0xA8, 0x3F);  // MUX=64 (128x64)
   ssd1309WriteCommand2(0xD3, 0x00);  // 显示偏移
   ssd1309WriteCommand(0x40);         // 起始行=0
-  ssd1309WriteCommand2(0x8D, 0x14);  // 电荷泵使能 (部分SSD1309模块需要)
-  ssd1309WriteCommand2(0x20, 0x00);  // 水平寻址模式
   ssd1309WriteCommand(0xA1);         // 段重映射 (列127→SEG0)
   ssd1309WriteCommand(0xC8);         // COM扫描方向 (重映射)
   ssd1309WriteCommand2(0xDA, 0x12);  // COM引脚配置 (128x64)
-  ssd1309WriteCommand2(0x81, 0xCF);  // 对比度
-  ssd1309WriteCommand2(0xD9, 0x22);  // 预充电 (SSD1309)
-  ssd1309WriteCommand2(0xDB, 0x40);  // VCOMH (SSD1309)
+  ssd1309WriteCommand2(0x81, 0x7F);  // 对比度
+  ssd1309WriteCommand2(0xD9, 0x82);  // 预充电 (阶段1=2, 阶段2=8)
+  ssd1309WriteCommand2(0xDB, 0x34);  // VCOMH
   ssd1309WriteCommand(0xA4);         // 恢复正常 (跟随RAM)
   ssd1309WriteCommand(0xA6);         // 非反相显示
-  ssd1309WriteCommand(0x2E);         // 停止滚动
-  ssd1309WriteCommand(0xAF);         // 显示ON
 
+  // 清屏并发送到显示芯片
   memset(g_buffer, 0, SSD1309_BUFFER_SIZE);
   g_cursorX = 0;
   g_cursorY = 0;
+  ssd1309Display();
+
+  ssd1309WriteCommand(0xAF);         // 显示ON
 
   g_initialized = true;
   ESP_LOGI(TAG, "SSD1309初始化成功");
