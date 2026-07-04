@@ -176,16 +176,16 @@ esp_err_t sensorServiceStop(void)
 
 esp_err_t sensorServicePublishDiscovery(void)
 {
-    publishDiscovery("f1", "Plant F1 (415-445nm)", NULL, NULL);
-    publishDiscovery("f2", "Plant F2 (445-480nm)", NULL, NULL);
-    publishDiscovery("f3", "Plant F3 (480-520nm)", NULL, NULL);
-    publishDiscovery("f4", "Plant F4 (520-550nm)", NULL, NULL);
-    publishDiscovery("f5", "Plant F5 (550-585nm)", NULL, NULL);
-    publishDiscovery("f6", "Plant F6 (585-630nm)", NULL, NULL);
-    publishDiscovery("f7", "Plant F7 (630-680nm)", NULL, NULL);
-    publishDiscovery("f8", "Plant F8 (680-720nm)", NULL, NULL);
+    publishDiscovery("f1_415nm", "Plant F1 (415-445nm)", NULL, NULL);
+    publishDiscovery("f2_445nm", "Plant F2 (445-480nm)", NULL, NULL);
+    publishDiscovery("f3_480nm", "Plant F3 (480-520nm)", NULL, NULL);
+    publishDiscovery("f4_515nm", "Plant F4 (520-550nm)", NULL, NULL);
+    publishDiscovery("f5_555nm", "Plant F5 (550-585nm)", NULL, NULL);
+    publishDiscovery("f6_590nm", "Plant F6 (585-630nm)", NULL, NULL);
+    publishDiscovery("f7_620nm", "Plant F7 (630-680nm)", NULL, NULL);
+    publishDiscovery("f8_670nm", "Plant F8 (680-720nm)", NULL, NULL);
     publishDiscovery("clear", "Plant Clear Channel", NULL, NULL);
-    publishDiscovery("nir", "Plant NIR", NULL, NULL);
+    publishDiscovery("nir_910nm", "Plant NIR", NULL, NULL);
     publishDiscovery("ndvi", "Plant NDVI", NULL, NULL);
     publishDiscovery("sipi", "Plant SIPI", NULL, NULL);
     publishDiscovery("psri", "Plant PSRI", NULL, NULL);
@@ -209,16 +209,16 @@ esp_err_t sensorServicePublishSpectralData(as7341_channels_spectral_data_t *data
 {
     if (data == NULL) return ESP_ERR_INVALID_ARG;
 
-    publishUintValue("f1", data->f1);
-    publishUintValue("f2", data->f2);
-    publishUintValue("f3", data->f3);
-    publishUintValue("f4", data->f4);
-    publishUintValue("f5", data->f5);
-    publishUintValue("f6", data->f6);
-    publishUintValue("f7", data->f7);
-    publishUintValue("f8", data->f8);
+    publishUintValue("f1_415nm", data->f1);
+    publishUintValue("f2_445nm", data->f2);
+    publishUintValue("f3_480nm", data->f3);
+    publishUintValue("f4_515nm", data->f4);
+    publishUintValue("f5_555nm", data->f5);
+    publishUintValue("f6_590nm", data->f6);
+    publishUintValue("f7_620nm", data->f7);
+    publishUintValue("f8_670nm", data->f8);
     publishUintValue("clear", data->clear);
-    publishUintValue("nir", data->nir);
+    publishUintValue("nir_910nm", data->nir);
 
     float ndvi = 0.0f;
     if ((data->f8 + data->f5) != 0) ndvi = (float)(data->f8 - data->f5) / (float)(data->f8 + data->f5);

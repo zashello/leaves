@@ -367,7 +367,7 @@ static void executeLedOn(void *param)
 void actionLedLightOn(void)
 {
     menuSystemEnterWaiting("TURN ON LED...");
-    xTaskCreate(executeLedOn, "led_on", 2048, NULL, 5, NULL);
+    xTaskCreate(executeLedOn, "led_on", 4096, NULL, 5, NULL);
 }
 
 static void executeLedOff(void *param)
@@ -384,7 +384,7 @@ static void executeLedOff(void *param)
 void actionLedLightOff(void)
 {
     menuSystemEnterWaiting("TURN OFF LED...");
-    xTaskCreate(executeLedOff, "led_off", 2048, NULL, 5, NULL);
+    xTaskCreate(executeLedOff, "led_off", 4096, NULL, 5, NULL);
 }
 
 void actionLedBrightness(void)

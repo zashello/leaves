@@ -26,9 +26,9 @@
 #define SCD41_I2C_FREQ         100000
 
 #define BUTTON_UP_GPIO         9
-#define BUTTON_DOWN_GPIO       10
+#define BUTTON_DOWN_GPIO       6
 #define BUTTON_CONFIRM_GPIO    11
-#define BUTTON_BACK_GPIO       12
+#define BUTTON_BACK_GPIO       7
 #define BUTTON_DEBOUNCE_MS     50
 #define BUTTON_LONG_PRESS_MS   3000
 
@@ -65,7 +65,6 @@
 #define HTTP_OUTPUT_BUFFER     8192
 #define SERVERCHAN_URL_PREFIX  "http://sctapi.ftqq.com/"
 
-#define OLED_RST_GPIO              21
 #define OLED_I2C_SOFT_SCL          13
 #define OLED_I2C_SOFT_SDA          14
 #define OLED_I2C_ADDRESS           0x3C

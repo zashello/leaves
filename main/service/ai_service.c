@@ -83,7 +83,7 @@ static void aiHttpPostRequest(void)
         return;
     }
 
-    char *outputBuffer = calloc(1, HTTP_OUTPUT_BUFFER * 2);
+    char *outputBuffer = calloc(1, HTTP_OUTPUT_BUFFER * 4);
     if (!outputBuffer) {
         ESP_LOGE(TAG, "内存分配失败");
         return;
@@ -137,7 +137,13 @@ static void aiHttpPostRequest(void)
     }
 
     snprintf(aiPrompt + promptLen, sizeof(aiPrompt) - promptLen,
-        "\n请根据以上全部传感器数据分析植物状态(包括健康度、营养状况、光照适应性、环境适宜度等),并给出照料建议");
+        "\n请以JSON格式返回植物分析结果，包含以下字段：\n"
+        "1. status: 健康/亚健康/不健康\n"
+        "2. health_score: 0-100的整数健康评分\n"
+        "3. spectral_summary: 将以上环境传感器数据和光谱传感器数据的所有通道和指数值按原字段名列出\n"
+        "4. analysis: 包含健康度、营养状况、光照适应性、环境适宜度四个维度的文字分析\n"
+        "5. advice: 具体的照料建议\n\n"
+        "请控制在800字以内，只返回JSON对象，不要包含其他文字和markdown标记。");
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "model", AI_MODEL_NAME);
@@ -216,7 +222,7 @@ static void aiHttpPostRequest(void)
         do {
             readLen = esp_http_client_read(client,
                 outputBuffer + totalRead,
-                HTTP_OUTPUT_BUFFER * 2 - totalRead - 1
+                HTTP_OUTPUT_BUFFER * 4 - totalRead - 1
             );
             if (readLen > 0) {
                 totalRead += readLen;

@@ -86,34 +86,35 @@ void menuDisplayShowPlantAnalysis(const ei_inference_result_t *result)
 {
     if (result == NULL) return;
 
-    char buf[64];
-    char upLabel[9] = {0};
+    char buf[32];
 
     ssd1309Clear();
 
     ssd1309SetCursor(0, 0);
     ssd1309Print("PLANT ANALYSIS");
 
-    if (result->bestLabel != NULL) {
+    for (int i = 0; i < EI_CLASS_COUNT; i++) {
+        char upLabel[9] = {0};
         int len = 0;
-        for (int i = 0; i < 8 && result->bestLabel[i] != '\0'; i++) {
-            upLabel[i] = (result->bestLabel[i] >= 'a' && result->bestLabel[i] <= 'z')
-                         ? result->bestLabel[i] - 32 : result->bestLabel[i];
-            if (upLabel[i] == '_') upLabel[i] = ' ';
-            len = i + 1;
+        for (int j = 0; j < 8 && result->results[i].label[j] != '\0'; j++) {
+            upLabel[j] = (result->results[i].label[j] >= 'a' && result->results[i].label[j] <= 'z')
+                         ? result->results[i].label[j] - 32 : result->results[i].label[j];
+            if (upLabel[j] == '_') upLabel[j] = ' ';
+            len = j + 1;
         }
         upLabel[len] = '\0';
+
+        if (i == 0) {
+            snprintf(buf, sizeof(buf), "*%s %.1f%%", upLabel, result->results[i].value * 100.0f);
+        } else {
+            snprintf(buf, sizeof(buf), "%d:%s %.1f%%", i + 1, upLabel, result->results[i].value * 100.0f);
+        }
+
+        ssd1309SetCursor(0, 8 + i * 8);
+        ssd1309Print(buf);
     }
 
-    ssd1309SetCursor(0, 8);
-    snprintf(buf, sizeof(buf), "BEST:%.8s %.1f%%", upLabel, result->results[0].value * 100.0f);
-    ssd1309Print(buf);
-
-    ssd1309SetCursor(0, 16);
-    snprintf(buf, sizeof(buf), "2ND: %.1f%%", result->results[1].value * 100.0f);
-    ssd1309Print(buf);
-
-    ssd1309SetCursor(0, 24);
+    ssd1309SetCursor(0, 48);
     ssd1309Print("PRESS BACK");
 
     ssd1309Display();

@@ -242,16 +242,16 @@ char* as7341DataToJson(const as7341_channels_spectral_data_t *data)
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) return NULL;
 
-    cJSON_AddNumberToObject(root, "f1", data->f1);
-    cJSON_AddNumberToObject(root, "f2", data->f2);
-    cJSON_AddNumberToObject(root, "f3", data->f3);
-    cJSON_AddNumberToObject(root, "f4", data->f4);
-    cJSON_AddNumberToObject(root, "f5", data->f5);
-    cJSON_AddNumberToObject(root, "f6", data->f6);
-    cJSON_AddNumberToObject(root, "f7", data->f7);
-    cJSON_AddNumberToObject(root, "f8", data->f8);
+    cJSON_AddNumberToObject(root, "f1_415nm", data->f1);
+    cJSON_AddNumberToObject(root, "f2_445nm", data->f2);
+    cJSON_AddNumberToObject(root, "f3_480nm", data->f3);
+    cJSON_AddNumberToObject(root, "f4_515nm", data->f4);
+    cJSON_AddNumberToObject(root, "f5_555nm", data->f5);
+    cJSON_AddNumberToObject(root, "f6_590nm", data->f6);
+    cJSON_AddNumberToObject(root, "f7_620nm", data->f7);
+    cJSON_AddNumberToObject(root, "f8_670nm", data->f8);
     cJSON_AddNumberToObject(root, "clear", data->clear);
-    cJSON_AddNumberToObject(root, "nir", data->nir);
+    cJSON_AddNumberToObject(root, "nir_910nm", data->nir);
     cJSON_AddNumberToObject(root, "ndvi", ndvi);
     cJSON_AddNumberToObject(root, "sipi", sipi);
     cJSON_AddNumberToObject(root, "psri", psri);

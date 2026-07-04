@@ -34,7 +34,7 @@ esp_err_t displayServiceInit(void)
         .height = OLED_HEIGHT,
         .sclPin = OLED_I2C_SOFT_SCL,
         .sdaPin = OLED_I2C_SOFT_SDA,
-        .rstPin = OLED_RST_GPIO,
+        .rstPin = -1,
         .address = OLED_I2C_ADDRESS,
         .columnOffset = OLED_COLUMN_OFFSET,
         .pageOffset = OLED_PAGE_OFFSET

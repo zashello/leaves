@@ -19,23 +19,23 @@ static void calculateVegetationIndices(
         return;
     }
 
-    if ((spectralData->f8 + spectralData->f5) != 0) {
-        *ndvi = (float)(spectralData->f8 - spectralData->f5) / 
-                (float)(spectralData->f8 + spectralData->f5);
+    if ((spectralData->nir + spectralData->f8) != 0) {
+        *ndvi = (float)(spectralData->nir - spectralData->f8) / 
+                (float)(spectralData->nir + spectralData->f8);
     } else {
         *ndvi = 0.0f;
     }
 
-    if ((spectralData->nir + spectralData->f7) != 0) {
-        *gndvi = (float)(spectralData->nir - spectralData->f7) / 
-                 (float)(spectralData->nir + spectralData->f7);
+    if ((spectralData->nir + spectralData->f5) != 0) {
+        *gndvi = (float)(spectralData->nir - spectralData->f5) / 
+                 (float)(spectralData->nir + spectralData->f5);
     } else {
         *gndvi = 0.0f;
     }
 
-    if (spectralData->f8 != 0) {
-        *psri = (float)(spectralData->f7 - spectralData->f5) / 
-                (float)spectralData->f8;
+    if (spectralData->nir != 0) {
+        *psri = (float)(spectralData->f8 - spectralData->f5) / 
+                (float)spectralData->nir;
     } else {
         *psri = 0.0f;
     }
